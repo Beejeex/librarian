@@ -118,6 +118,26 @@ class TestRunScanRadarr:
 
         assert scan_run.total_items == 0
 
+    async def test_batch_size_limits_items_collected(self, db_session, sample_config):
+        """Scan stores at most batch_size mismatches even when more exist in arr."""
+        # sample_config.batch_size == 10; create 12 distinct mismatching movies
+        movies = [
+            {
+                "id": i,
+                "title": f"Movie {i}",
+                "year": 2000 + i,
+                "tmdbId": 100 + i,
+                "path": f"/movies/Movie.{i}.old",
+            }
+            for i in range(1, 13)  # 12 items, all mismatching
+        ]
+        with patch("app.scanner.get_radarr_client", return_value=_make_radarr_client(movies)):
+            scan_run = await run_scan("radarr", db_session, sample_config)
+
+        assert scan_run.total_items == sample_config.batch_size  # capped at 10
+        items = db_session.exec(select(RenameItem)).all()
+        assert len(items) == sample_config.batch_size
+
 
 class TestRunScanSonarr:
     async def test_mismatch_creates_pending_item(self, db_session, sample_config):
