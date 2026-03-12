@@ -174,9 +174,11 @@ async def save_settings(
     radarr_url: str = Form(""),
     radarr_api_key: str = Form(""),
     radarr_root_folder: str = Form("/movies"),
+    radarr_folder_format: str = Form("{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}"),
     sonarr_url: str = Form(""),
     sonarr_api_key: str = Form(""),
     sonarr_root_folder: str = Form("/tv"),
+    sonarr_folder_format: str = Form("{Series TitleYear} {tvdb-{TvdbId}}"),
     batch_size: int = Form(20),
 ):
     """Handle settings form POST — save config and re-render with success flag."""
@@ -186,9 +188,11 @@ async def save_settings(
             "radarr_url": radarr_url,
             "radarr_api_key": radarr_api_key,
             "radarr_root_folder": radarr_root_folder,
+            "radarr_folder_format": radarr_folder_format,
             "sonarr_url": sonarr_url,
             "sonarr_api_key": sonarr_api_key,
             "sonarr_root_folder": sonarr_root_folder,
+            "sonarr_folder_format": sonarr_folder_format,
             "batch_size": batch_size,
         },
     )

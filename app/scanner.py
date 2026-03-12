@@ -68,12 +68,15 @@ async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
     root_folder = (
         config.radarr_root_folder if source == "radarr" else config.sonarr_root_folder
     )
+    folder_format = (
+        config.radarr_folder_format if source == "radarr" else config.sonarr_folder_format
+    )
 
     for item in items:
         # Stop once we have a full batch — the next scan will pick up the rest.
         if mismatch_count >= batch_size:
             break
-        rename_item = _build_rename_item(item, source, scan_run.id, root_folder)
+        rename_item = _build_rename_item(item, source, scan_run.id, root_folder, folder_format)
         if rename_item is None:
             continue  # already correct or invalid — skip
         session.add(rename_item)
@@ -118,6 +121,7 @@ def _build_rename_item(
     source: str,
     scan_run_id: int,
     root_folder: str,
+    folder_format: str,
 ) -> RenameItem | None:
     """
     Build a RenameItem for a single arr item if renaming is needed.
@@ -142,11 +146,11 @@ def _build_rename_item(
 
     current_folder = os.path.basename(current_path)
 
-    # Compute expected name
+    # Compute expected name using the configured folder format
     if source == "radarr":
-        expected_folder = movie_folder_name(item)
+        expected_folder = movie_folder_name(item, folder_format)
     else:
-        expected_folder = series_folder_name(item)
+        expected_folder = series_folder_name(item, folder_format)
 
     if current_folder == expected_folder:
         return None  # already correct

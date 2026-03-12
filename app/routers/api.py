@@ -197,6 +197,41 @@ async def start_apply(
 
 
 # ---------------------------------------------------------------------------
+# Settings
+# ---------------------------------------------------------------------------
+
+class TestConnectionRequest(BaseModel):
+    source: str  # "radarr" or "sonarr"
+    url: str
+    api_key: str
+
+
+@router.post("/api/test-connection", tags=["settings"])
+async def test_connection(body: TestConnectionRequest) -> dict:
+    """
+    Test connectivity to Radarr or Sonarr and return the folder naming format.
+
+    Returns: { success: bool, folder_format: str, error?: str }
+    """
+    if body.source not in ("radarr", "sonarr"):
+        raise HTTPException(status_code=400, detail="source must be 'radarr' or 'sonarr'")
+
+    from app.radarr import RadarrClient
+    from app.sonarr import SonarrClient
+
+    try:
+        if body.source == "radarr":
+            client = RadarrClient(body.url, body.api_key)
+        else:
+            client = SonarrClient(body.url, body.api_key)
+        folder_format = await client.fetch_folder_format()
+        return {"success": True, "folder_format": folder_format}
+    except Exception as exc:
+        logger.warning("Test connection failed for source=%s: %s", body.source, exc)
+        return {"success": False, "folder_format": "", "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
 # SSE stream
 # ---------------------------------------------------------------------------
 @router.get("/api/stream", tags=["apply"])
@@ -237,9 +272,11 @@ class SettingsPayload(BaseModel):
     radarr_url: str = ""
     radarr_api_key: str = ""
     radarr_root_folder: str = "/movies"
+    radarr_folder_format: str = "{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}"
     sonarr_url: str = ""
     sonarr_api_key: str = ""
     sonarr_root_folder: str = "/tv"
+    sonarr_folder_format: str = "{Series TitleYear} {tvdb-{TvdbId}}"
     batch_size: int = 20
 
 
@@ -251,9 +288,11 @@ async def get_settings(session: Session = Depends(get_session)) -> dict:
         "radarr_url": config.radarr_url,
         "radarr_api_key": config.radarr_api_key,
         "radarr_root_folder": config.radarr_root_folder,
+        "radarr_folder_format": config.radarr_folder_format,
         "sonarr_url": config.sonarr_url,
         "sonarr_api_key": config.sonarr_api_key,
         "sonarr_root_folder": config.sonarr_root_folder,
+        "sonarr_folder_format": config.sonarr_folder_format,
         "batch_size": config.batch_size,
     }
 

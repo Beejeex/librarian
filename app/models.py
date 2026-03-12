@@ -23,9 +23,11 @@ class AppConfig(SQLModel, table=True):
     radarr_url: str = ""
     radarr_api_key: str = ""
     radarr_root_folder: str = "/movies"
+    radarr_folder_format: str = "{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}"
     sonarr_url: str = ""
     sonarr_api_key: str = ""
     sonarr_root_folder: str = "/tv"
+    sonarr_folder_format: str = "{Series TitleYear} {tvdb-{TvdbId}}"
     batch_size: int = 20
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

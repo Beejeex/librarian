@@ -8,7 +8,9 @@
 <div class="alert alert-success">Settings saved successfully.</div>
 {% endif %}
 
-<form method="post" action="/settings">
+<form method="post" action="/settings"
+      x-data="settingsApp()"
+      @submit="onSubmit">
 
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
 
@@ -19,14 +21,14 @@
       <div class="form-group">
         <label for="radarr_url">URL</label>
         <input type="text" id="radarr_url" name="radarr_url"
-               value="{{ config.radarr_url }}"
+               x-model="radarrUrl"
                placeholder="http://192.168.1.10:7878">
       </div>
 
       <div class="form-group">
         <label for="radarr_api_key">API Key</label>
         <input type="password" id="radarr_api_key" name="radarr_api_key"
-               value="{{ config.radarr_api_key }}"
+               x-model="radarrKey"
                placeholder="your-radarr-api-key">
       </div>
 
@@ -39,6 +41,36 @@
           The path prefix Radarr uses internally (e.g. <code>/movies</code>).
         </p>
       </div>
+
+      <div class="form-group">
+        <label for="radarr_folder_format">Movie Folder Format</label>
+        <input type="text" id="radarr_folder_format" name="radarr_folder_format"
+               x-model="radarrFolderFormat"
+               placeholder="{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}">
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">
+          Fetched automatically on Test Connection.
+          Supported tokens: <code>{Movie CleanTitle}</code>, <code>{Movie Title}</code>,
+          <code>{Release Year}</code>, <code>{tmdb-{TmdbId}}</code>, <code>{imdb-{ImdbId}}</code>.
+        </p>
+      </div>
+
+      {# Test Connection button #}
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-top:0.5rem;">
+        <button type="button" class="btn btn-secondary"
+                @click="testRadarr()"
+                :disabled="!radarrUrl || radarrTesting"
+                style="min-width:140px;">
+          <span x-show="!radarrTesting">Test Connection</span>
+          <span x-show="radarrTesting">Testing…</span>
+        </button>
+        <span x-show="radarrStatus === 'ok'"
+              style="color:#16a34a; font-weight:600;">✓ Connected</span>
+        <span x-show="radarrStatus === 'error'"
+              style="color:#dc2626; font-weight:600;">✗ Failed</span>
+      </div>
+      <p x-show="radarrStatus === 'error'"
+         x-text="radarrError"
+         style="color:#dc2626; font-size:0.85rem; margin-top:6px;"></p>
     </div>
 
     {# ── Sonarr ── #}
@@ -48,14 +80,14 @@
       <div class="form-group">
         <label for="sonarr_url">URL</label>
         <input type="text" id="sonarr_url" name="sonarr_url"
-               value="{{ config.sonarr_url }}"
+               x-model="sonarrUrl"
                placeholder="http://192.168.1.10:8989">
       </div>
 
       <div class="form-group">
         <label for="sonarr_api_key">API Key</label>
         <input type="password" id="sonarr_api_key" name="sonarr_api_key"
-               value="{{ config.sonarr_api_key }}"
+               x-model="sonarrKey"
                placeholder="your-sonarr-api-key">
       </div>
 
@@ -68,6 +100,36 @@
           The path prefix Sonarr uses internally (e.g. <code>/tv</code>).
         </p>
       </div>
+
+      <div class="form-group">
+        <label for="sonarr_folder_format">Series Folder Format</label>
+        <input type="text" id="sonarr_folder_format" name="sonarr_folder_format"
+               x-model="sonarrFolderFormat"
+               placeholder="{Series TitleYear} {tvdb-{TvdbId}}">
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">
+          Fetched automatically on Test Connection.
+          Supported tokens: <code>{Series TitleYear}</code>, <code>{Series Title}</code>,
+          <code>{Series CleanTitle}</code>, <code>{Series Year}</code>, <code>{tvdb-{TvdbId}}</code>.
+        </p>
+      </div>
+
+      {# Test Connection button #}
+      <div style="display:flex; align-items:center; gap:0.75rem; margin-top:0.5rem;">
+        <button type="button" class="btn btn-secondary"
+                @click="testSonarr()"
+                :disabled="!sonarrUrl || sonarrTesting"
+                style="min-width:140px;">
+          <span x-show="!sonarrTesting">Test Connection</span>
+          <span x-show="sonarrTesting">Testing…</span>
+        </button>
+        <span x-show="sonarrStatus === 'ok'"
+              style="color:#16a34a; font-weight:600;">✓ Connected</span>
+        <span x-show="sonarrStatus === 'error'"
+              style="color:#dc2626; font-weight:600;">✗ Failed</span>
+      </div>
+      <p x-show="sonarrStatus === 'error'"
+         x-text="sonarrError"
+         style="color:#dc2626; font-size:0.85rem; margin-top:6px;"></p>
     </div>
 
   </div>
@@ -80,12 +142,143 @@
       <input type="number" id="batch_size" name="batch_size"
              value="{{ config.batch_size }}" min="1" max="500">
       <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">
-        How many folders to rename per apply run.
+        How many folders to scan and rename per run.
       </p>
     </div>
   </div>
 
-  <button type="submit" class="btn btn-primary">Save Settings</button>
+  {# Save — disabled until untested URLs have been tested #}
+  <div style="display:flex; align-items:center; gap:1rem;">
+    <button type="submit" class="btn btn-primary"
+            :disabled="!canSave"
+            :style="!canSave ? 'opacity:0.45; cursor:not-allowed;' : ''">
+      Save Settings
+    </button>
+    <span x-show="!canSave" style="color:#94a3b8; font-size:0.85rem;">
+      Test the connection first to enable Save.
+    </span>
+  </div>
 
 </form>
+
+<script>
+function settingsApp() {
+  return {
+    // Current field values (tracked so we can detect changes after a test)
+    radarrUrl:  {{ config.radarr_url | tojson }},
+    radarrKey:  {{ config.radarr_api_key | tojson }},
+    sonarrUrl:  {{ config.sonarr_url | tojson }},
+    sonarrKey:  {{ config.sonarr_api_key | tojson }},
+
+    // Folder formats — updated by test connection or typed manually
+    radarrFolderFormat: {{ config.radarr_folder_format | tojson }},
+    sonarrFolderFormat: {{ config.sonarr_folder_format | tojson }},
+
+    // The URL/key values at the time of the last successful test.
+    // If current values differ, the test is considered stale.
+    radarrTestedUrl: {{ config.radarr_url | tojson }},
+    radarrTestedKey: {{ config.radarr_api_key | tojson }},
+    sonarrTestedUrl: {{ config.sonarr_url | tojson }},
+    sonarrTestedKey: {{ config.sonarr_api_key | tojson }},
+
+    // true if the current URL/key have been successfully tested
+    radarrTested: {{ 'true' if config.radarr_url else 'false' }},
+    sonarrTested: {{ 'true' if config.sonarr_url else 'false' }},
+
+    radarrTesting: false,
+    sonarrTesting: false,
+    radarrStatus: null,   // null | 'ok' | 'error'
+    sonarrStatus: null,
+    radarrError: '',
+    sonarrError: '',
+
+    // Needs a test when URL is non-empty and either hasn't been tested yet
+    // or the URL/key have changed since the last test.
+    get radarrNeedsTest() {
+      return !!this.radarrUrl && (
+        !this.radarrTested ||
+        this.radarrUrl !== this.radarrTestedUrl ||
+        this.radarrKey !== this.radarrTestedKey
+      );
+    },
+    get sonarrNeedsTest() {
+      return !!this.sonarrUrl && (
+        !this.sonarrTested ||
+        this.sonarrUrl !== this.sonarrTestedUrl ||
+        this.sonarrKey !== this.sonarrTestedKey
+      );
+    },
+    get canSave() {
+      return !this.radarrNeedsTest && !this.sonarrNeedsTest;
+    },
+
+    async testRadarr() {
+      this.radarrTesting = true;
+      this.radarrStatus = null;
+      this.radarrError = '';
+      try {
+        const r = await fetch('/api/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'radarr', url: this.radarrUrl, api_key: this.radarrKey })
+        });
+        const data = await r.json();
+        if (data.success) {
+          this.radarrStatus = 'ok';
+          this.radarrFolderFormat = data.folder_format;
+          this.radarrTested = true;
+          this.radarrTestedUrl = this.radarrUrl;
+          this.radarrTestedKey = this.radarrKey;
+        } else {
+          this.radarrStatus = 'error';
+          this.radarrError = data.error || 'Connection failed';
+          this.radarrTested = false;
+        }
+      } catch (e) {
+        this.radarrStatus = 'error';
+        this.radarrError = 'Request failed: ' + e.message;
+        this.radarrTested = false;
+      } finally {
+        this.radarrTesting = false;
+      }
+    },
+
+    async testSonarr() {
+      this.sonarrTesting = true;
+      this.sonarrStatus = null;
+      this.sonarrError = '';
+      try {
+        const r = await fetch('/api/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ source: 'sonarr', url: this.sonarrUrl, api_key: this.sonarrKey })
+        });
+        const data = await r.json();
+        if (data.success) {
+          this.sonarrStatus = 'ok';
+          this.sonarrFolderFormat = data.folder_format;
+          this.sonarrTested = true;
+          this.sonarrTestedUrl = this.sonarrUrl;
+          this.sonarrTestedKey = this.sonarrKey;
+        } else {
+          this.sonarrStatus = 'error';
+          this.sonarrError = data.error || 'Connection failed';
+          this.sonarrTested = false;
+        }
+      } catch (e) {
+        this.sonarrStatus = 'error';
+        this.sonarrError = 'Request failed: ' + e.message;
+        this.sonarrTested = false;
+      } finally {
+        this.sonarrTesting = false;
+      }
+    },
+
+    // Prevent form submission if Save is disabled (belt-and-suspenders)
+    onSubmit(e) {
+      if (!this.canSave) e.preventDefault();
+    }
+  }
+}
+</script>
 {% endblock %}

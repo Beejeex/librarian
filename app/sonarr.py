@@ -8,6 +8,7 @@ Path updates use GET-then-PUT to avoid sending partial objects.
 import logging
 
 from app.arr_client import BaseArrClient
+from app.naming import DEFAULT_SERIES_FORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,14 @@ class SonarrClient(BaseArrClient):
         Returns a list of full series objects from GET /api/v3/series.
         """
         return await self.get("/api/v3/series")
+
+    async def fetch_folder_format(self) -> str:
+        """
+        Fetch the series folder naming format from Sonarr's naming config.
+        Returns the seriesFolderFormat string, or the default if not present.
+        """
+        data = await self.get("/api/v3/config/naming")
+        return data.get("seriesFolderFormat", DEFAULT_SERIES_FORMAT)  # type: ignore[union-attr]
 
     async def update_series_path(self, series_id: int, new_path: str) -> None:
         """

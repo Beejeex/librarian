@@ -8,6 +8,7 @@ Path updates use GET-then-PUT to avoid sending partial objects.
 import logging
 
 from app.arr_client import BaseArrClient
+from app.naming import DEFAULT_MOVIE_FORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,14 @@ class RadarrClient(BaseArrClient):
         Returns a list of full movie objects from GET /api/v3/movie.
         """
         return await self.get("/api/v3/movie")
+
+    async def fetch_folder_format(self) -> str:
+        """
+        Fetch the movie folder naming format from Radarr's naming config.
+        Returns the movieFolderFormat string, or the default if not present.
+        """
+        data = await self.get("/api/v3/config/naming")
+        return data.get("movieFolderFormat", DEFAULT_MOVIE_FORMAT)  # type: ignore[union-attr]
 
     async def update_movie_path(self, movie_id: int, new_path: str) -> None:
         """
