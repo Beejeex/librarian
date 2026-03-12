@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+httpx
+sse-starlette
+jinja2
+python-multipart
+pytest
+pytest-asyncio
+pytest-httpx
+respx

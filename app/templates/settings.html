@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}Librarian — Settings{% endblock %}
+
+{% block content %}
+<h1>Settings</h1>
+
+{% if saved %}
+<div class="alert alert-success">Settings saved successfully.</div>
+{% endif %}
+
+<form method="post" action="/settings">
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
+
+    {# ── Radarr ── #}
+    <div class="card">
+      <h2 style="margin-bottom:1.25rem;">🎬 Radarr</h2>
+
+      <div class="form-group">
+        <label for="radarr_url">URL</label>
+        <input type="text" id="radarr_url" name="radarr_url"
+               value="{{ config.radarr_url }}"
+               placeholder="http://192.168.1.10:7878">
+      </div>
+
+      <div class="form-group">
+        <label for="radarr_api_key">API Key</label>
+        <input type="password" id="radarr_api_key" name="radarr_api_key"
+               value="{{ config.radarr_api_key }}"
+               placeholder="your-radarr-api-key">
+      </div>
+
+      <div class="form-group">
+        <label for="radarr_root_folder">Root Folder</label>
+        <input type="text" id="radarr_root_folder" name="radarr_root_folder"
+               value="{{ config.radarr_root_folder }}"
+               placeholder="/movies">
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">
+          The path prefix Radarr uses internally (e.g. <code>/movies</code>).
+        </p>
+      </div>
+    </div>
+
+    {# ── Sonarr ── #}
+    <div class="card">
+      <h2 style="margin-bottom:1.25rem;">📺 Sonarr</h2>
+
+      <div class="form-group">
+        <label for="sonarr_url">URL</label>
+        <input type="text" id="sonarr_url" name="sonarr_url"
+               value="{{ config.sonarr_url }}"
+               placeholder="http://192.168.1.10:8989">
+      </div>
+
+      <div class="form-group">
+        <label for="sonarr_api_key">API Key</label>
+        <input type="password" id="sonarr_api_key" name="sonarr_api_key"
+               value="{{ config.sonarr_api_key }}"
+               placeholder="your-sonarr-api-key">
+      </div>
+
+      <div class="form-group">
+        <label for="sonarr_root_folder">Root Folder</label>
+        <input type="text" id="sonarr_root_folder" name="sonarr_root_folder"
+               value="{{ config.sonarr_root_folder }}"
+               placeholder="/tv">
+        <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">
+          The path prefix Sonarr uses internally (e.g. <code>/tv</code>).
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  {# ── General ── #}
+  <div class="card">
+    <h2 style="margin-bottom:1.25rem;">General</h2>
+    <div class="form-group" style="max-width:200px;">
+      <label for="batch_size">Default Batch Size</label>
+      <input type="number" id="batch_size" name="batch_size"
+             value="{{ config.batch_size }}" min="1" max="500">
+      <p style="font-size:0.8rem; color:#94a3b8; margin-top:4px;">
+        How many folders to rename per apply run.
+      </p>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Save Settings</button>
+
+</form>
+{% endblock %}

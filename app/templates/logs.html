@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Librarian — {% if mode == "apply" %}Apply{% else %}Logs{% endif %}{% endblock %}
+
+{% block content %}
+{% if mode == "apply" %}
+<h1>Applying Changes</h1>
+<p style="color:#64748b; margin-bottom:1.5rem; font-size:0.9rem;">
+  Live output below. The process runs in the background — you can navigate away and return to <a href="/logs">Logs</a>.
+</p>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="log-box" id="log-output"
+    x-data="logStreamer({{ scan_run_id }}, {{ batch_size }})"
+    x-init="start()"
+    x-ref="box"></div>
+</div>
+
+<div id="summary" style="display:none;" class="card">
+  <div class="alert alert-success" id="summary-msg"></div>
+  <a href="/" class="btn btn-ghost" style="margin-right:8px;">Dashboard</a>
+  <a href="/logs" class="btn btn-ghost">View Logs</a>
+</div>
+
+<script>
+function logStreamer(scanRunId, batchSize) {
+  return {
+    async start() {
+      // Kick off the apply
+      await fetch('/api/apply', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ scan_run_id: scanRunId, batch_size: batchSize })
+      });
+
+      // Connect to SSE stream
+      const box = document.getElementById('log-output');
+      const es = new EventSource('/api/stream');
+      es.onmessage = (e) => {
+        box.textContent += e.data + '\n';
+        box.scrollTop = box.scrollHeight;
+        if (e.data.startsWith('[DONE]')) {
+          es.close();
+          document.getElementById('summary').style.display = '';
+          document.getElementById('summary-msg').textContent = e.data;
+        }
+      };
+      es.onerror = () => {
+        box.textContent += '\n[Connection closed]\n';
+        es.close();
+        document.getElementById('summary').style.display = '';
+      };
+    }
+  };
+}
+</script>
+
+{% else %}
+{# ── View mode ── #}
+<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+  <h1 style="margin:0;">Logs</h1>
+  <button class="btn btn-ghost" style="margin-left:auto;"
+    onclick="
+      fetch('/api/logs/clear', {method:'POST'})
+        .then(() => location.reload());
+    ">Clear</button>
+</div>
+
+<div class="card" style="padding:0; overflow:hidden;">
+  <div class="log-box">{% if lines %}{{ lines | join('\n') }}{% else %}(no recent log output){% endif %}</div>
+</div>
+{% endif %}
+{% endblock %}

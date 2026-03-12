@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Librarian — Dashboard{% endblock %}
+
+{% block content %}
+<h1>Dashboard</h1>
+
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:2rem;">
+
+  {# ── Radarr card ── #}
+  <div class="card" x-data="{ loading: false }">
+    <h2>🎬 Radarr</h2>
+    {% if radarr_run %}
+    <p style="font-size:0.875rem; color:#64748b; margin-bottom:1rem;">
+      Last scan:
+      <span class="badge badge-{{ radarr_run.status }}">{{ radarr_run.status }}</span>
+      &nbsp;·&nbsp; {{ radarr_run.total_items }} mismatch(es)
+      &nbsp;·&nbsp; {{ radarr_run.done_count }} done
+      {% if radarr_run.error_count > 0 %}
+        &nbsp;·&nbsp; <span style="color:#ef4444;">{{ radarr_run.error_count }} error(s)</span>
+      {% endif %}
+    </p>
+    {% if radarr_run.status in ("ready", "error") %}
+    <a href="/review?source=radarr" class="btn btn-ghost" style="margin-right:8px;">Review</a>
+    {% endif %}
+    {% else %}
+    <p style="font-size:0.875rem; color:#94a3b8; margin-bottom:1rem;">No scans yet.</p>
+    {% endif %}
+
+    {% if not config.radarr_url %}
+    <p style="font-size:0.8rem; color:#f59e0b;">⚠ Radarr URL not configured. <a href="/settings">Settings</a></p>
+    {% else %}
+    <button class="btn btn-primary"
+      :disabled="loading"
+      @click="
+        loading = true;
+        fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'radarr'})})
+          .then(r => r.json())
+          .then(d => { window.location = '/review?source=radarr'; })
+          .catch(() => { loading = false; });
+      ">
+      <span x-show="!loading">Scan Radarr</span>
+      <span x-show="loading">Scanning…</span>
+    </button>
+    {% endif %}
+  </div>
+
+  {# ── Sonarr card ── #}
+  <div class="card" x-data="{ loading: false }">
+    <h2>📺 Sonarr</h2>
+    {% if sonarr_run %}
+    <p style="font-size:0.875rem; color:#64748b; margin-bottom:1rem;">
+      Last scan:
+      <span class="badge badge-{{ sonarr_run.status }}">{{ sonarr_run.status }}</span>
+      &nbsp;·&nbsp; {{ sonarr_run.total_items }} mismatch(es)
+      &nbsp;·&nbsp; {{ sonarr_run.done_count }} done
+      {% if sonarr_run.error_count > 0 %}
+        &nbsp;·&nbsp; <span style="color:#ef4444;">{{ sonarr_run.error_count }} error(s)</span>
+      {% endif %}
+    </p>
+    {% if sonarr_run.status in ("ready", "error") %}
+    <a href="/review?source=sonarr" class="btn btn-ghost" style="margin-right:8px;">Review</a>
+    {% endif %}
+    {% else %}
+    <p style="font-size:0.875rem; color:#94a3b8; margin-bottom:1rem;">No scans yet.</p>
+    {% endif %}
+
+    {% if not config.sonarr_url %}
+    <p style="font-size:0.8rem; color:#f59e0b;">⚠ Sonarr URL not configured. <a href="/settings">Settings</a></p>
+    {% else %}
+    <button class="btn btn-primary"
+      :disabled="loading"
+      @click="
+        loading = true;
+        fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'sonarr'})})
+          .then(r => r.json())
+          .then(d => { window.location = '/review?source=sonarr'; })
+          .catch(() => { loading = false; });
+      ">
+      <span x-show="!loading">Scan Sonarr</span>
+      <span x-show="loading">Scanning…</span>
+    </button>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
