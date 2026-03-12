@@ -7,7 +7,7 @@
 <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:2rem;">
 
   {# ── Radarr card ── #}
-  <div class="card" x-data="{ loading: false }">
+  <div class="card" x-data="{ loading: false, error: '' }">
     <h2>🎬 Radarr</h2>
     {% if radarr_run %}
     <p style="font-size:0.875rem; color:#64748b; margin-bottom:1rem;">
@@ -32,20 +32,24 @@
     <button class="btn btn-primary"
       :disabled="loading"
       @click="
-        loading = true;
+        loading = true; error = '';
         fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'radarr'})})
           .then(r => r.json())
-          .then(d => { window.location = '/review?source=radarr'; })
-          .catch(() => { loading = false; });
+          .then(d => {
+            if (d.error) { error = d.error; loading = false; }
+            else { window.location = '/review?source=radarr'; }
+          })
+          .catch(e => { error = 'Network error: ' + e; loading = false; });
       ">
       <span x-show="!loading">Scan Radarr</span>
       <span x-show="loading">Scanning…</span>
     </button>
+    <p x-show="error" x-text="error" style="font-size:0.8rem; color:#ef4444; margin-top:8px;"></p>
     {% endif %}
   </div>
 
   {# ── Sonarr card ── #}
-  <div class="card" x-data="{ loading: false }">
+  <div class="card" x-data="{ loading: false, error: '' }">
     <h2>📺 Sonarr</h2>
     {% if sonarr_run %}
     <p style="font-size:0.875rem; color:#64748b; margin-bottom:1rem;">
@@ -70,15 +74,19 @@
     <button class="btn btn-primary"
       :disabled="loading"
       @click="
-        loading = true;
+        loading = true; error = '';
         fetch('/api/scan', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({source:'sonarr'})})
           .then(r => r.json())
-          .then(d => { window.location = '/review?source=sonarr'; })
-          .catch(() => { loading = false; });
+          .then(d => {
+            if (d.error) { error = d.error; loading = false; }
+            else { window.location = '/review?source=sonarr'; }
+          })
+          .catch(e => { error = 'Network error: ' + e; loading = false; });
       ">
       <span x-show="!loading">Scan Sonarr</span>
       <span x-show="loading">Scanning…</span>
     </button>
+    <p x-show="error" x-text="error" style="font-size:0.8rem; color:#ef4444; margin-top:8px;"></p>
     {% endif %}
   </div>
 

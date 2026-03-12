@@ -67,7 +67,12 @@ async def trigger_scan(
         raise HTTPException(status_code=400, detail="source must be 'radarr' or 'sonarr'")
 
     config = get_config(session)
-    scan_run = await run_scan(body.source, session, config)
+    try:
+        scan_run = await run_scan(body.source, session, config)
+    except Exception as exc:
+        logger.error("Scan failed for source=%s: %s", body.source, exc)
+        # Return error payload instead of crashing — UI displays it as an alert
+        return {"error": str(exc), "scan_run_id": None, "total_items": 0}
     return {"scan_run_id": scan_run.id, "total_items": scan_run.total_items}
 
 

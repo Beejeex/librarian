@@ -8,6 +8,10 @@
 <div class="card">
   <p style="color:#64748b;">No scan results found for <strong>{{ source }}</strong>. <a href="/">Run a scan first.</a></p>
 </div>
+{% elif scan_run.status == "scanning" %}
+<div class="card" x-data="{}" x-init="setTimeout(() => location.reload(), 2000)">
+  <p style="color:#64748b;">⏳ Scan in progress… refreshing automatically.</p>
+</div>
 {% elif items | length == 0 %}
 <div class="card">
   <div class="alert alert-success">Everything looks good — no folder mismatches found.</div>
