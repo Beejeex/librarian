@@ -462,6 +462,36 @@ Never leave uncommitted changes after a passing build+test cycle.
 
 ---
 
+## Release & GHCR Push
+
+Registry: `ghcr.io/beejeex/librarian`
+
+After a passing build+test cycle, to release a new version:
+
+1. Bump `VERSION` in `app/version.py` (e.g. `v0.0.7`).
+2. Commit: `git add -A; git commit -m "chore: bump version to vX.Y.Z"`
+3. Build the image: `docker build -t librarian .`
+4. Run tests: `docker run --rm librarian pytest -v`
+5. Tag for GHCR:
+   ```powershell
+   docker tag librarian:latest ghcr.io/beejeex/librarian:vX.Y.Z
+   docker tag librarian:latest ghcr.io/beejeex/librarian:latest
+   ```
+6. Push both tags:
+   ```powershell
+   docker push ghcr.io/beejeex/librarian:vX.Y.Z
+   docker push ghcr.io/beejeex/librarian:latest
+   ```
+7. Create a Git tag and push: `git tag vX.Y.Z; git push origin master --tags`
+
+GHCR authentication (first time or after token expiry):
+```powershell
+echo $env:GHCR_PAT | docker login ghcr.io -u beejeex --password-stdin
+```
+A PAT with `write:packages` scope is required.
+
+---
+
 ## Coding Standards
 
 - **Type hints** everywhere.
