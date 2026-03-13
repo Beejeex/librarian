@@ -36,10 +36,10 @@ class RadarrClient(BaseArrClient):
         Update the folder path for a movie in Radarr's database.
 
         Performs a GET to retrieve the full object, modifies only the path,
-        then PUTs the full object back. This prevents missing-required-field errors.
-        No file move is triggered — Radarr only updates its DB record.
+        then PUTs the full object back. moveFiles=false ensures Radarr only
+        updates its DB record — no physical file move is triggered.
         """
         movie = await self.get(f"/api/v3/movie/{movie_id}")
         movie["path"] = new_path
-        await self.put(f"/api/v3/movie/{movie_id}", movie)
+        await self.put(f"/api/v3/movie/{movie_id}?moveFiles=false", movie)
         logger.info("Radarr movie %s path updated to %s", movie_id, new_path)

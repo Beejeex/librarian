@@ -36,9 +36,10 @@ class SonarrClient(BaseArrClient):
         Update the folder path for a series in Sonarr's database.
 
         Performs a GET to retrieve the full object, modifies only the path,
-        then PUTs the full object back. No file move is triggered.
+        then PUTs the full object back. moveFiles=false ensures Sonarr only
+        updates its DB record — no physical file move is triggered.
         """
         series = await self.get(f"/api/v3/series/{series_id}")
         series["path"] = new_path
-        await self.put(f"/api/v3/series/{series_id}", series)
+        await self.put(f"/api/v3/series/{series_id}?moveFiles=false", series)
         logger.info("Sonarr series %s path updated to %s", series_id, new_path)

@@ -116,30 +116,86 @@ async def _process_item(
     session: Session,
     config: AppConfig,
 ) -> None:
-    """Rename one folder on disk and update the arr database path."""
+    """
+    Process one RenameItem based on its disk_scenario.
+
+    Scenarios:
+      rename    — old folder exists, new does not → rename on disk + update arr
+      arr_only  — disk already has expected name → update arr path only
+      collision — both old and new exist on disk → error, skip (unsafe to rename)
+      missing   — neither folder exists on disk  → error, skip
+      unknown   — scenario was not classified at scan time → re-check live
+    """
     source = item.source
     media_mount = MEDIA_MOUNTS[source]
 
-    # --- Step A: Rename on disk ---
     try:
         old_local = remap_to_container(item.current_path, root_folder, media_mount)
         parent_dir = os.path.dirname(old_local)
         new_local = os.path.join(parent_dir, item.expected_folder)
-        await asyncio.to_thread(os.rename, old_local, new_local)
-        log_buffer.append(f"✔ [{item.title}] disk rename OK")
-        logger.info("Renamed on disk: %s → %s", old_local, new_local)
-    except Exception as exc:
-        msg = f"Disk rename failed: {exc}"
-        item.status = "error"
-        item.error_message = msg
-        item.updated_at = datetime.now(UTC)
-        session.add(item)
-        session.commit()
-        log_buffer.append(f"✘ [{item.title}] disk rename FAILED: {exc}")
-        logger.error("Disk rename failed for item %s: %s", item.id, exc)
-        return  # do not attempt arr update if disk rename failed
+    except ValueError as exc:
+        _mark_error(item, f"Path remap failed: {exc}", session)
+        log_buffer.append(f"[{item.title}] ERROR: {exc}")
+        logger.error("Path remap failed for item %s: %s", item.id, exc)
+        return
 
-    # --- Step B: Update arr path ---
+    scenario = item.disk_scenario
+
+    # Re-classify at apply time for items scanned before this feature existed
+    if scenario == "unknown":
+        old_exists = os.path.isdir(old_local)
+        new_exists = os.path.isdir(new_local)
+        if old_exists and not new_exists:
+            scenario = "rename"
+        elif not old_exists and new_exists:
+            scenario = "arr_only"
+        elif old_exists and new_exists:
+            scenario = "collision"
+        else:
+            scenario = "missing"
+
+    log_buffer.append(
+        f"[{item.title}]  [{scenario}]"
+    )
+    log_buffer.append(f"  {item.current_folder}")
+    log_buffer.append(f"  → {item.expected_folder}")
+
+    # --- Handle each scenario ---
+
+    if scenario == "collision":
+        msg = (
+            f"Both '{item.current_folder}' and '{item.expected_folder}' exist on disk. "
+            "Resolve the conflict manually, then re-scan."
+        )
+        _mark_error(item, msg, session)
+        log_buffer.append(f"  ↳ COLLISION — both folders exist, skipped")
+        logger.warning("Collision for item %s: %s", item.id, msg)
+        return
+
+    if scenario == "missing":
+        msg = f"Folder '{item.current_folder}' not found on disk at {old_local}"
+        _mark_error(item, msg, session)
+        log_buffer.append(f"  ↳ MISSING — source folder not found, skipped")
+        logger.warning("Missing folder for item %s: %s", item.id, msg)
+        return
+
+    if scenario == "rename":
+        # Normal path: rename folder on disk first
+        try:
+            await asyncio.to_thread(os.rename, old_local, new_local)
+            log_buffer.append(f"  ↳ disk rename OK")
+            logger.info("Renamed on disk: %s → %s", old_local, new_local)
+        except Exception as exc:
+            _mark_error(item, f"Disk rename failed: {exc}", session)
+            log_buffer.append(f"  ↳ disk rename FAILED: {exc}")
+            logger.error("Disk rename failed for item %s: %s", item.id, exc)
+            return
+
+    if scenario == "arr_only":
+        log_buffer.append(f"  ↳ disk already correct, updating arr path only")
+        logger.info("Disk already at expected path for item %s, arr update only", item.id)
+
+    # --- Update arr path (moveFiles=false — no physical move triggered) ---
     try:
         if source == "radarr":
             client = get_radarr_client(config)
@@ -148,22 +204,31 @@ async def _process_item(
             client = get_sonarr_client(config)
             await client.update_series_path(item.source_id, item.expected_path)
         item.status = "done"
-        log_buffer.append(f"✔ [{item.title}] arr path updated OK")
+        log_buffer.append(f"  ↳ arr path updated → {item.expected_path}")
         logger.info("arr path updated for item %s → %s", item.id, item.expected_path)
     except Exception as exc:
-        # Disk was renamed but arr not updated — user must fix manually
+        # Disk was renamed (or was already correct) but arr not updated
         item.status = "error"
         item.error_message = (
-            f"Disk renamed to '{item.expected_folder}' but arr update FAILED: {exc}. "
+            f"Disk is correct ('{item.expected_folder}') but arr update FAILED: {exc}. "
             "Update the path manually in the arr UI."
         )
         log_buffer.append(
-            f"⚠ [{item.title}] arr update FAILED — disk was renamed. Manual fix needed."
+            f"  ↳ arr update FAILED — disk is correct, manual fix needed: {exc}"
         )
         logger.error(
-            "arr update failed for item %s after disk rename: %s", item.id, exc
+            "arr update failed for item %s after disk operation: %s", item.id, exc
         )
 
+    item.updated_at = datetime.now(UTC)
+    session.add(item)
+    session.commit()
+
+
+def _mark_error(item: RenameItem, message: str, session: Session) -> None:
+    """Set item status to error and persist."""
+    item.status = "error"
+    item.error_message = message
     item.updated_at = datetime.now(UTC)
     session.add(item)
     session.commit()

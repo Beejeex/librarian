@@ -70,9 +70,9 @@ class TestUpdateMoviePath:
             url=f"{BASE_URL}/api/v3/movie/1",
             json=MOVIE_OBJ,
         )
-        # PUT updated object
+        # PUT updated object — note moveFiles=false query param
         httpx_mock.add_response(
-            url=f"{BASE_URL}/api/v3/movie/1",
+            url=f"{BASE_URL}/api/v3/movie/1?moveFiles=false",
             method="PUT",
             json=updated_obj,
         )
@@ -91,7 +91,7 @@ class TestUpdateMoviePath:
             json=MOVIE_OBJ,
         )
         httpx_mock.add_response(
-            url=f"{BASE_URL}/api/v3/movie/1",
+            url=f"{BASE_URL}/api/v3/movie/1?moveFiles=false",
             method="PUT",
             status_code=500,
         )

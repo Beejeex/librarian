@@ -68,10 +68,11 @@
     <table>
       <thead>
         <tr>
-          <th style="width:40%;">Current Folder</th>
-          <th style="width:40%;">Expected Folder</th>
-          <th style="width:10%;">Status</th>
-          <th style="width:10%;">Action</th>
+          <th style="width:36%;">Current Folder</th>
+          <th style="width:36%;">Expected Folder</th>
+          <th style="width:14%;">Scenario</th>
+          <th style="width:7%;">Status</th>
+          <th style="width:7%;">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -81,6 +82,20 @@
             :style="status === 'skipped' ? 'opacity:0.45' : ''">
           <td style="font-family:monospace; font-size:0.8rem; word-break:break-all;">{{ item.current_folder }}</td>
           <td style="font-family:monospace; font-size:0.8rem; word-break:break-all; color:#0f172a; font-weight:500;">{{ item.expected_folder }}</td>
+          <td>
+            {% set sc = item.disk_scenario %}
+            {% if sc == 'rename' %}
+              <span title="Disk rename + arr update" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#dbeafe; color:#1d4ed8;">rename</span>
+            {% elif sc == 'arr_only' %}
+              <span title="Folder already correct on disk — arr path update only" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#dcfce7; color:#16a34a;">arr only</span>
+            {% elif sc == 'collision' %}
+              <span title="Both folders exist on disk — resolve manually before approving" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#fee2e2; color:#dc2626;">⚠ collision</span>
+            {% elif sc == 'missing' %}
+              <span title="Source folder not found on disk" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#fef9c3; color:#92400e;">missing</span>
+            {% else %}
+              <span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; color:#94a3b8;">—</span>
+            {% endif %}
+          </td>
           <td>
             <span class="badge"
               :class="'badge-' + status"

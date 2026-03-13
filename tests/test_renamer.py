@@ -50,7 +50,8 @@ def _make_scan_run(db_session):
     return run
 
 
-def _make_item(db_session, scan_run_id, current_path, expected_folder, expected_path, source="radarr"):
+def _make_item(db_session, scan_run_id, current_path, expected_folder, expected_path,
+               source="radarr", disk_scenario="rename"):
     item = RenameItem(
         scan_run_id=scan_run_id,
         source=source,
@@ -61,6 +62,7 @@ def _make_item(db_session, scan_run_id, current_path, expected_folder, expected_
         current_path=current_path,
         expected_path=expected_path,
         status="approved",
+        disk_scenario=disk_scenario,
     )
     db_session.add(item)
     db_session.commit()
@@ -107,7 +109,7 @@ class TestRunApply:
 
     async def test_disk_rename_failure_marks_error(self, db_session, sample_config, tmp_media):
         """
-        If os.rename raises, item is marked error and arr PUT is NOT called.
+        If os.rename raises (missing scenario), item is marked error and arr PUT is NOT called.
         """
         run = _make_scan_run(db_session)
         item = _make_item(
@@ -116,6 +118,7 @@ class TestRunApply:
             current_path="/movies/NonExistent",
             expected_folder="Target Folder",
             expected_path="/movies/Target Folder",
+            disk_scenario="missing",
         )
 
         mock_client = AsyncMock()
@@ -133,7 +136,7 @@ class TestRunApply:
 
     async def test_arr_update_failure_marks_error_with_message(self, db_session, sample_config, tmp_media):
         """
-        If arr PUT fails after disk rename, item is error with explicit 'disk was renamed' message.
+        If arr PUT fails after disk rename, item is error with explicit 'disk is correct' message.
         """
         old_folder = tmp_media / "movies" / "OldName"
         old_folder.mkdir(parents=True, exist_ok=True)
@@ -145,6 +148,7 @@ class TestRunApply:
             current_path="/movies/OldName",
             expected_folder="NewName",
             expected_path="/movies/NewName",
+            disk_scenario="rename",
         )
 
         mock_client = AsyncMock()
@@ -167,19 +171,21 @@ class TestRunApply:
         (tmp_media / "movies" / "GoodMovie").mkdir(parents=True, exist_ok=True)
 
         run = _make_scan_run(db_session)
-        # item 1: non-existent folder → disk rename will fail
+        # item 1: missing scenario → will error
         item1 = _make_item(
             db_session, run.id,
             current_path="/movies/NonExistent",
             expected_folder="Target1",
             expected_path="/movies/Target1",
+            disk_scenario="missing",
         )
-        # item 2: existing folder → should succeed
+        # item 2: normal rename scenario → should succeed
         item2 = _make_item(
             db_session, run.id,
             current_path="/movies/GoodMovie",
             expected_folder="GoodMovie (2020) {tmdb-999}",
             expected_path="/movies/GoodMovie (2020) {tmdb-999}",
+            disk_scenario="rename",
         )
 
         mock_client = AsyncMock()
@@ -195,3 +201,88 @@ class TestRunApply:
         db_session.refresh(item2)
         assert item1.status == "error"
         assert item2.status == "done"
+
+    async def test_arr_only_skips_disk_renames_updates_arr(self, db_session, sample_config, tmp_media):
+        """
+        arr_only scenario: disk already has expected folder — no os.rename, arr still updated.
+        """
+        # Only the EXPECTED folder exists — old name is gone
+        (tmp_media / "movies" / "Dune (2021) {tmdb-438631}").mkdir(parents=True, exist_ok=True)
+
+        run = _make_scan_run(db_session)
+        item = _make_item(
+            db_session, run.id,
+            current_path="/movies/Dune.2021.2160p",
+            expected_folder="Dune (2021) {tmdb-438631}",
+            expected_path="/movies/Dune (2021) {tmdb-438631}",
+            disk_scenario="arr_only",
+        )
+
+        mock_client = AsyncMock()
+        mock_client.update_movie_path = AsyncMock()
+
+        with (
+            patch("app.renamer.MEDIA_MOUNTS", {"radarr": str(tmp_media / "movies"), "sonarr": str(tmp_media / "tv")}),
+            patch("app.renamer.get_radarr_client", return_value=mock_client),
+        ):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "done"
+        mock_client.update_movie_path.assert_called_once()
+        # Expected folder must still exist (arr_only does not touch disk)
+        assert (tmp_media / "movies" / "Dune (2021) {tmdb-438631}").exists()
+
+    async def test_collision_scenario_marks_error_no_rename(self, db_session, sample_config, tmp_media):
+        """
+        collision scenario: both old and new folder exist — must error, no rename.
+        """
+        (tmp_media / "movies" / "OldName").mkdir(parents=True, exist_ok=True)
+        (tmp_media / "movies" / "NewName").mkdir(parents=True, exist_ok=True)
+
+        run = _make_scan_run(db_session)
+        item = _make_item(
+            db_session, run.id,
+            current_path="/movies/OldName",
+            expected_folder="NewName",
+            expected_path="/movies/NewName",
+            disk_scenario="collision",
+        )
+
+        mock_client = AsyncMock()
+
+        with (
+            patch("app.renamer.MEDIA_MOUNTS", {"radarr": str(tmp_media / "movies"), "sonarr": str(tmp_media / "tv")}),
+            patch("app.renamer.get_radarr_client", return_value=mock_client),
+        ):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "error"
+        assert "collision" in item.error_message.lower() or "both" in item.error_message.lower()
+        mock_client.update_movie_path.assert_not_called()
+
+    async def test_missing_scenario_marks_error_no_arr_call(self, db_session, sample_config, tmp_media):
+        """
+        missing scenario: neither old nor new folder exists — must error, no arr call.
+        """
+        run = _make_scan_run(db_session)
+        item = _make_item(
+            db_session, run.id,
+            current_path="/movies/Phantom",
+            expected_folder="Phantom (2023) {tmdb-111}",
+            expected_path="/movies/Phantom (2023) {tmdb-111}",
+            disk_scenario="missing",
+        )
+
+        mock_client = AsyncMock()
+
+        with (
+            patch("app.renamer.MEDIA_MOUNTS", {"radarr": str(tmp_media / "movies"), "sonarr": str(tmp_media / "tv")}),
+            patch("app.renamer.get_radarr_client", return_value=mock_client),
+        ):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "error"
+        mock_client.update_movie_path.assert_not_called()

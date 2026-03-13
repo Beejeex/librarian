@@ -33,6 +33,7 @@ def _run_migrations() -> None:
     new_columns = [
         ("appconfig", "radarr_folder_format", "VARCHAR NOT NULL DEFAULT '{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}'"),
         ("appconfig", "sonarr_folder_format", "VARCHAR NOT NULL DEFAULT '{Series TitleYear} {tvdb-{TvdbId}}'"),
+        ("renameitem", "disk_scenario", "VARCHAR NOT NULL DEFAULT 'unknown'"),
     ]
     with engine.connect() as conn:
         for table, column, definition in new_columns:

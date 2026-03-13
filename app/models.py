@@ -65,6 +65,7 @@ class RenameItem(SQLModel, table=True):
     current_path: str  # full path in arr namespace (as arr reports it)
     expected_path: str  # full expected path in arr namespace
     status: str = "pending"  # pending, approved, skipped, done, error
+    disk_scenario: str = "unknown"  # rename | arr_only | collision | missing | unknown
     error_message: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

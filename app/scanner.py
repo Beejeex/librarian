@@ -17,11 +17,9 @@ from sqlmodel import Session, select
 from app.config import get_radarr_client, get_sonarr_client
 from app.models import AppConfig, RenameItem, ScanRun
 from app.naming import movie_folder_name, series_folder_name
+from app.renamer import MEDIA_MOUNTS, remap_to_container
 
 logger = logging.getLogger(__name__)
-
-# Media mount paths inside the container (fixed by Dockerfile)
-MEDIA_MOUNTS = {"radarr": "/media/movies", "sonarr": "/media/tv"}
 
 
 async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
@@ -155,6 +153,28 @@ def _build_rename_item(
     if current_folder == expected_folder:
         return None  # already correct
 
+    # --- Classify disk scenario ---
+    # Check whether the old and new folder paths actually exist on disk
+    # so the Review page can show the operator exactly what will happen.
+    media_mount = MEDIA_MOUNTS.get(source, "")
+    disk_scenario = "unknown"
+    if media_mount:
+        try:
+            old_local = remap_to_container(current_path, root_folder, media_mount)
+            new_local = os.path.join(os.path.dirname(old_local), expected_folder)
+            old_exists = os.path.isdir(old_local)
+            new_exists = os.path.isdir(new_local)
+            if old_exists and not new_exists:
+                disk_scenario = "rename"      # normal: rename on disk + update arr
+            elif not old_exists and new_exists:
+                disk_scenario = "arr_only"    # disk ahead: just update arr path
+            elif old_exists and new_exists:
+                disk_scenario = "collision"   # both exist: cannot rename safely
+            else:
+                disk_scenario = "missing"     # neither exists on disk
+        except (ValueError, OSError):
+            disk_scenario = "unknown"
+
     # Build the expected full path in arr namespace
     expected_path = os.path.join(root_folder, expected_folder)
 
@@ -168,4 +188,5 @@ def _build_rename_item(
         current_path=current_path,
         expected_path=expected_path,
         status="pending",
+        disk_scenario=disk_scenario,
     )

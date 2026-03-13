@@ -68,8 +68,9 @@ class TestUpdateSeriesPath:
             url=f"{BASE_URL}/api/v3/series/1",
             json=SERIES_OBJ,
         )
+        # PUT updated object — note moveFiles=false query param
         httpx_mock.add_response(
-            url=f"{BASE_URL}/api/v3/series/1",
+            url=f"{BASE_URL}/api/v3/series/1?moveFiles=false",
             method="PUT",
             json=updated_obj,
         )
@@ -88,7 +89,7 @@ class TestUpdateSeriesPath:
             json=SERIES_OBJ,
         )
         httpx_mock.add_response(
-            url=f"{BASE_URL}/api/v3/series/1",
+            url=f"{BASE_URL}/api/v3/series/1?moveFiles=false",
             method="PUT",
             status_code=500,
         )
