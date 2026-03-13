@@ -26,7 +26,7 @@ from sse_starlette.sse import EventSourceResponse
 from sqlmodel import Session, select
 
 from app.config import get_config, save_config
-from app.database import get_session
+from app.database import get_session_dep as get_session
 from app.log_buffer import log_buffer
 from app.models import AppConfig, RenameItem, ScanRun
 from app.renamer import run_apply
@@ -189,7 +189,7 @@ async def start_apply(
     async def _run():
         # Use a fresh session inside background task — sessions are not thread-safe
         from app.database import get_session as _gs
-        with next(_gs()) as bg_session:
+        with _gs() as bg_session:
             await run_apply(body.scan_run_id, body.batch_size, bg_session, config)
 
     background_tasks.add_task(_run)

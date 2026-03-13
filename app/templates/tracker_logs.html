@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Librarian — Tracker Logs{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+  <h1 style="margin:0">Tracker Logs</h1>
+  <a href="/tracker" class="btn btn-ghost">← Dashboard</a>
+</div>
+
+<div class="card"
+     x-data="logStream()"
+     x-init="init()"
+     @unload.window="destroy()">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:1rem;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:.75rem">
+      <span x-text="connected ? 'Live' : 'Disconnected'"
+            :style="connected
+              ? 'background:#22c55e;color:#fff;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600'
+              : 'background:#ef4444;color:#fff;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600'">
+      </span>
+      <label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;cursor:pointer">
+        <input type="checkbox" x-model="autoScroll" style="accent-color:#3b82f6;">
+        Auto-scroll
+      </label>
+    </div>
+    <button class="btn btn-danger"
+            style="padding:6px 14px;font-size:.8rem;"
+            @click="clearLogs()"
+            x-text="clearing ? 'Cleared' : 'Clear logs'"></button>
+  </div>
+
+  <pre id="tracker-log-output" class="log-box">
+    <span x-show="lines.length === 0" style="color:#64748b">Waiting for log output…</span>
+    <template x-for="line in lines" :key="line">
+      <div x-text="line"></div>
+    </template>
+  </pre>
+</div>
+
+<script>
+function logStream() {
+  return {
+    lines: [],
+    connected: false,
+    autoScroll: true,
+    clearing: false,
+    _source: null,
+    _reconnectTimer: null,
+
+    init() { this.connect(); },
+
+    connect() {
+      if (this._source) this._source.close();
+      this._source = new EventSource('/api/tracker/logs/stream');
+      this._source.onopen = () => { this.connected = true; };
+      this._source.onmessage = (e) => {
+        if (e.data) {
+          this.lines.push(e.data);
+          if (this.lines.length > 500) this.lines.shift();
+        }
+        if (this.autoScroll) this.$nextTick(() => this.scrollToBottom());
+      };
+      this._source.onerror = () => {
+        this.connected = false;
+        this._source.close();
+        this._reconnectTimer = setTimeout(() => this.connect(), 3000);
+      };
+    },
+
+    scrollToBottom() {
+      const el = document.getElementById('tracker-log-output');
+      if (el) el.scrollTop = el.scrollHeight;
+    },
+
+    async clearLogs() {
+      await fetch('/api/tracker/logs/clear', { method: 'POST' });
+      this.lines = [];
+      this.clearing = true;
+      setTimeout(() => { this.clearing = false; }, 2000);
+    },
+
+    destroy() {
+      if (this._source) this._source.close();
+      if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    },
+  };
+}
+</script>
+{% endblock %}

@@ -104,6 +104,11 @@
     .badge-scanning { background: #e0f2fe; color: #0369a1; }
     .badge-ready    { background: #d1fae5; color: #065f46; }
     .badge-applying { background: #fef3c7; color: #92400e; }
+    /* ── Tracker status badges ── */
+    .badge-queued   { background: #fef3c7; color: #92400e; }
+    .badge-copying  { background: #ede9fe; color: #5b21b6; }
+    .badge-copied   { background: #dbeafe; color: #1e40af; }
+    .badge-finished { background: #d1fae5; color: #065f46; }
 
     /* ── Table ── */
     table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
@@ -151,6 +156,30 @@
     .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
     .alert-error   { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
 
+    /* ── Tabs ── */
+    .tab-nav {
+      display: flex;
+      border-bottom: 2px solid #e2e8f0;
+      margin-bottom: 1.5rem;
+      gap: 0;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      padding: .55rem 1.2rem;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      color: #64748b;
+      transition: color .15s, border-color .15s;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { color: #1e293b; }
+    .tab-btn.tab-active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    .tab-btn.tab-danger.tab-active { color: #ef4444; border-bottom-color: #ef4444; }
+
     /* ── Code / log ── */
     .log-box {
       background: #0f172a;
@@ -172,9 +201,11 @@
   <nav>
     <a href="/" class="brand">📚 Librarian</a>
     <a href="/" {% if request.url.path == "/" %}class="active"{% endif %}>Dashboard</a>
-    <a href="/review" {% if request.url.path == "/review" %}class="active"{% endif %}>Review</a>
-    <a href="/settings" {% if request.url.path == "/settings" %}class="active"{% endif %}>Settings</a>
+    <a href="/review" {% if request.url.path in ('/review', '/apply') or request.url.path.startswith('/review') %}class="active"{% endif %}>Renamer</a>
+    <a href="/tracker" {% if request.url.path.startswith("/tracker") %}class="active"{% endif %}>Tracker</a>
     <a href="/logs" {% if request.url.path == "/logs" %}class="active"{% endif %}>Logs</a>
+    <a href="/settings" {% if request.url.path == "/settings" %}class="active"{% endif %}>Settings</a>
+    <span style="margin-left:auto;color:#64748b;font-size:.78rem;font-weight:500;letter-spacing:.02em;">{{ VERSION }}</span>
   </nav>
   <div class="page">
     {% block content %}{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %} — Items{% endblock %}
+
+{% block content %}
+<h1>Tracked Items</h1>
+
+{# Alpine.js status filter + search bar #}
+<div x-data="{ filter: 'all', search: '' }" class="card">
+
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem">
+        <input
+            type="search"
+            placeholder="Search titles…"
+            x-model.debounce.300ms="search"
+            style="padding:.35rem .65rem;border:1px solid #cbd5e1;border-radius:.375rem;font-size:.875rem;flex:1;min-width:180px;max-width:320px;outline:none"
+        >
+    </div>
+
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">
+        {% for label, color in [('all','#475569'),('queued','#d97706'),('pending','#78716c'),('copying','#7c3aed'),('copied','#0284c7'),('finished','#16a34a'),('error','#dc2626')] %}
+        <button
+            class="btn btn-sm"
+            :style="filter==='{{ label }}' ? 'background:{{ color }};color:#fff' : 'background:#e2e8f0;color:#1e293b'"
+            @click="filter='{{ label }}'">{{ label | capitalize }}</button>
+        {% endfor %}
+    </div>
+
+    {% if items %}
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Source</th>
+                <th>Tag(s)</th>
+                <th>Status</th>
+                <th>Size</th>
+                <th>Updated</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody
+            hx-get="/items/rows-fragment"
+            hx-trigger="every 5s"
+            hx-swap="innerHTML">
+            {% include "_items_rows.html" %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#94a3b8">No items yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

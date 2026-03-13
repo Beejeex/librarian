@@ -18,9 +18,9 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from app.config import get_config, save_config
-from app.database import get_session
+from app.database import get_session_dep as get_session
 from app.log_buffer import log_buffer
-from app.models import RenameItem, ScanRun
+from app.models import RenameItem, ScanRun, TrackedItem
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -61,6 +61,12 @@ async def dashboard(
     radarr_run = _latest("radarr")
     sonarr_run = _latest("sonarr")
 
+    # Tracker summary counts for the dashboard widget
+    all_tracked = session.exec(select(TrackedItem)).all()
+    tracker_counts = {"queued": 0, "pending": 0, "copying": 0, "copied": 0, "finished": 0, "error": 0}
+    for item in all_tracked:
+        tracker_counts[item.status] = tracker_counts.get(item.status, 0) + 1
+
     templates = get_templates()
     return templates.TemplateResponse(
         "dashboard.html",
@@ -69,6 +75,7 @@ async def dashboard(
             "radarr_run": radarr_run,
             "sonarr_run": sonarr_run,
             "config": config,
+            "tracker_counts": tracker_counts,
         },
     )
 
@@ -83,40 +90,45 @@ async def review(
     session: Session = Depends(get_session),
 ):
     """
-    Render the review page: mismatch table with approve/skip toggles.
-
-    Defaults to showing the latest scan run for the given source.
+    Render the review page: tabs for Radarr and Sonarr mismatches side by side.
+    The `source` query param pre-selects the active tab.
     """
     config = get_config(session)
 
-    scan_run = session.exec(
-        select(ScanRun)
-        .where(ScanRun.source == source)
-        .order_by(ScanRun.id.desc())  # type: ignore[arg-type]
-        .limit(1)
-    ).first()
+    def _scan_data(src: str) -> tuple:
+        run = session.exec(
+            select(ScanRun)
+            .where(ScanRun.source == src)
+            .order_by(ScanRun.id.desc())  # type: ignore[arg-type]
+            .limit(1)
+        ).first()
+        items: list[RenameItem] = []
+        if run:
+            items = list(
+                session.exec(
+                    select(RenameItem)
+                    .where(
+                        RenameItem.scan_run_id == run.id,
+                        RenameItem.status.in_(("pending", "approved", "skipped")),  # type: ignore[attr-defined]
+                    )
+                    .order_by(RenameItem.id)  # type: ignore[arg-type]
+                ).all()
+            )
+        return run, items
 
-    items: list[RenameItem] = []
-    if scan_run:
-        items = list(
-            session.exec(
-                select(RenameItem)
-                .where(
-                    RenameItem.scan_run_id == scan_run.id,
-                    RenameItem.status.in_(("pending", "approved", "skipped")),  # type: ignore[attr-defined]
-                )
-                .order_by(RenameItem.id)  # type: ignore[arg-type]
-            ).all()
-        )
+    radarr_run, radarr_items = _scan_data("radarr")
+    sonarr_run, sonarr_items = _scan_data("sonarr")
 
     templates = get_templates()
     return templates.TemplateResponse(
         "review.html",
         {
             "request": request,
-            "source": source,
-            "scan_run": scan_run,
-            "items": items,
+            "active_source": source if source in ("radarr", "sonarr") else "radarr",
+            "radarr_run": radarr_run,
+            "radarr_items": radarr_items,
+            "sonarr_run": sonarr_run,
+            "sonarr_items": sonarr_items,
             "batch_size": config.batch_size,
         },
     )
@@ -171,15 +183,35 @@ async def settings_page(
 async def save_settings(
     request: Request,
     session: Session = Depends(get_session),
+    # Librarian — Radarr
     radarr_url: str = Form(""),
     radarr_api_key: str = Form(""),
     radarr_root_folder: str = Form("/movies"),
     radarr_folder_format: str = Form("{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}"),
+    # Librarian — Sonarr
     sonarr_url: str = Form(""),
     sonarr_api_key: str = Form(""),
     sonarr_root_folder: str = Form("/tv"),
     sonarr_folder_format: str = Form("{Series TitleYear} {tvdb-{TvdbId}}"),
+    # Librarian — General
     batch_size: int = Form(20),
+    # Tracker
+    radarr_tags: str = Form(""),
+    sonarr_tags: str = Form(""),
+    poll_interval_minutes: int = Form(15),
+    max_concurrent_copies: int = Form(2),
+    max_share_size_gb: float = Form(0.0),
+    max_share_files: int = Form(0),
+    share_path: str = Form("/share"),
+    require_approval: str = Form(""),  # checkbox: "true" or ""
+    # Notifications
+    ntfy_url: str = Form("https://ntfy.sh"),
+    ntfy_topic: str = Form(""),
+    ntfy_token: str = Form(""),
+    ntfy_on_copied: str = Form(""),
+    ntfy_on_error: str = Form(""),
+    ntfy_on_finished: str = Form(""),
+    ntfy_on_first_run: str = Form(""),
 ):
     """Handle settings form POST — save config and re-render with success flag."""
     save_config(
@@ -194,8 +226,26 @@ async def save_settings(
             "sonarr_root_folder": sonarr_root_folder,
             "sonarr_folder_format": sonarr_folder_format,
             "batch_size": batch_size,
+            "radarr_tags": radarr_tags,
+            "sonarr_tags": sonarr_tags,
+            "poll_interval_minutes": poll_interval_minutes,
+            "max_concurrent_copies": max_concurrent_copies,
+            "max_share_size_gb": max_share_size_gb,
+            "max_share_files": max_share_files,
+            "share_path": share_path,
+            "require_approval": require_approval == "true",
+            "ntfy_url": ntfy_url,
+            "ntfy_topic": ntfy_topic,
+            "ntfy_token": ntfy_token,
+            "ntfy_on_copied": ntfy_on_copied == "true",
+            "ntfy_on_error": ntfy_on_error == "true",
+            "ntfy_on_finished": ntfy_on_finished == "true",
+            "ntfy_on_first_run": ntfy_on_first_run == "true",
         },
     )
+    # Reschedule the poll loop with the new interval
+    from app.scheduler import reschedule_poll
+    reschedule_poll(poll_interval_minutes)
     config = get_config(session)
     templates = get_templates()
     return templates.TemplateResponse(
@@ -209,7 +259,8 @@ async def save_settings(
 # ---------------------------------------------------------------------------
 @router.get("/logs", response_class=HTMLResponse, tags=["ui"])
 async def logs_page(request: Request):
-    """Render the logs page showing cached recent log output."""
+    """Render the unified logs page (Renamer + Tracker tabs)."""
+    from app.log_buffer import get_recent_logs
     recent_lines = log_buffer.tail(200)
     templates = get_templates()
     return templates.TemplateResponse(

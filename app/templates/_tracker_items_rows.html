@@ -1,0 +1,58 @@
+{% for item in items %}
+<tr x-show="
+  (filter === 'all' || filter === '{{ item.status }}') &&
+  (!search || '{{ item.title | lower }}'.includes(search.toLowerCase()) || '{{ (item.series_title or '') | lower }}'.includes(search.toLowerCase()))
+">
+  <td>
+    <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;" title="{{ item.title }}">
+      {{ item.title }}
+    </div>
+    <div style="display:flex;gap:.4rem;margin-top:.25rem;flex-wrap:wrap;">
+      {% if item.is_backlog %}
+      <span style="background:#fef9c3;color:#854d0e;font-size:.7rem;padding:1px 7px;border-radius:999px;font-weight:600;">Backlog</span>
+      {% endif %}
+      {% if item.is_upgraded %}
+      <span style="background:#ede9fe;color:#6d28d9;font-size:.7rem;padding:1px 7px;border-radius:999px;font-weight:600;">Upgraded</span>
+      {% endif %}
+      {% if item.error_message %}
+      <span style="color:#dc2626;font-size:.75rem;" title="{{ item.error_message }}">⚠ {{ item.error_message[:60] }}{% if item.error_message|length > 60 %}…{% endif %}</span>
+      {% endif %}
+    </div>
+  </td>
+  <td style="white-space:nowrap;">
+    {% if item.media_type == 'movie' %}🎬{% else %}📺{% endif %}
+    {{ item.media_type | capitalize }}
+  </td>
+  <td>{{ item.source | capitalize }}</td>
+  <td>
+    {% if item.tag %}<code style="font-size:.78rem;">{{ item.tag }}</code>{% else %}<span style="color:#94a3b8;">—</span>{% endif %}
+  </td>
+  <td>
+    <span class="badge badge-{{ item.status }}">{{ item.status | capitalize }}</span>
+  </td>
+  <td style="white-space:nowrap;">
+    {% if item.file_size_bytes %}{{ item.file_size_bytes | filesize }}{% else %}<span style="color:#94a3b8;">—</span>{% endif %}
+  </td>
+  <td style="white-space:nowrap;color:#64748b;font-size:.85rem;">{{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+  <td style="white-space:nowrap;">
+    {% if item.status == 'queued' %}
+    <form method="post" action="/tracker/items/{{ item.id }}/approve" style="display:inline;">
+      <button type="submit" class="btn btn-primary" style="padding:4px 10px;font-size:.8rem;">Approve</button>
+    </form>
+    <form method="post" action="/tracker/items/{{ item.id }}/skip" style="display:inline;margin-left:.3rem;">
+      <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:.8rem;">Skip</button>
+    </form>
+    {% elif item.status in ('finished', 'copied', 'error') %}
+    <form method="post" action="/tracker/items/{{ item.id }}/reset" style="display:inline;">
+      <button type="submit" class="btn btn-secondary" style="padding:4px 10px;font-size:.8rem;">Re-copy</button>
+    </form>
+    {% else %}
+    <span style="color:#94a3b8;font-size:.8rem;">—</span>
+    {% endif %}
+  </td>
+</tr>
+{% else %}
+<tr>
+  <td colspan="8" style="text-align:center;color:#64748b;padding:2rem;">No items tracked yet.</td>
+</tr>
+{% endfor %}

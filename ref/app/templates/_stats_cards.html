@@ -1,0 +1,28 @@
+<div class="card">
+    <div class="card-title">Total</div>
+    <div class="card-value">{{ counts.values() | sum }}</div>
+</div>
+<div class="card">
+    <div class="card-title">Queued</div>
+    <div class="card-value" style="color:#d97706">{{ counts.queued }}</div>
+</div>
+<div class="card">
+    <div class="card-title">Pending</div>
+    <div class="card-value" style="color:#78716c">{{ counts.pending }}</div>
+</div>
+<div class="card">
+    <div class="card-title">Copying</div>
+    <div class="card-value" style="color:#7c3aed">{{ counts.copying }}</div>
+</div>
+<div class="card">
+    <div class="card-title">Copied</div>
+    <div class="card-value" style="color:#0284c7">{{ counts.copied }}</div>
+</div>
+<div class="card">
+    <div class="card-title">Finished</div>
+    <div class="card-value" style="color:#16a34a">{{ counts.finished }}</div>
+</div>
+<div class="card">
+    <div class="card-title">Error</div>
+    <div class="card-value" style="color:#dc2626">{{ counts.error }}</div>
+</div>

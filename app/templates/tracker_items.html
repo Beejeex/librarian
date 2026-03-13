@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Librarian — Tracker Items{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+  <h1 style="margin:0">Tracked Items</h1>
+  <a href="/tracker" class="btn btn-ghost">← Dashboard</a>
+</div>
+
+<div class="card" x-data="{ filter: 'all', search: '' }">
+
+  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+    <input type="search"
+           placeholder="Search titles…"
+           x-model.debounce.300ms="search"
+           style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;flex:1;min-width:180px;max-width:320px;">
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+      {% set filter_pills = [
+        ('all','#475569'), ('queued','#d97706'), ('pending','#78716c'),
+        ('copying','#7c3aed'), ('copied','#1d4ed8'), ('finished','#16a34a'), ('error','#dc2626')
+      ] %}
+      {% for label, color in filter_pills %}
+      <button class="btn"
+              style="padding:4px 12px;font-size:.8rem;"
+              :style="filter==='{{ label }}' ? 'background:{{ color }};color:#fff' : 'background:#f1f5f9;color:#374151;border:1px solid #e2e8f0'"
+              @click="filter='{{ label }}'">{{ label | capitalize }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if items %}
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Type</th>
+        <th>Source</th>
+        <th>Tag(s)</th>
+        <th>Status</th>
+        <th>Size</th>
+        <th>Updated</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody hx-get="/tracker/items/rows-fragment"
+           hx-trigger="every 5s"
+           hx-swap="innerHTML">
+      {% include "_tracker_items_rows.html" %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#94a3b8">No items tracked yet. Configure tags in Settings and wait for the first poll.</p>
+  {% endif %}
+</div>
+{% endblock %}

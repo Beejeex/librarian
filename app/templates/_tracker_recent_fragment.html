@@ -1,0 +1,52 @@
+{% if recent %}
+<table class="table" style="margin:0;">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Type</th>
+      <th>Source</th>
+      <th>Status</th>
+      <th>Size</th>
+      <th>Updated</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in recent %}
+    <tr>
+      <td>
+        <div style="font-weight:600;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{ item.title }}">{{ item.title }}</div>
+        <div style="display:flex;gap:.35rem;margin-top:.2rem;flex-wrap:wrap;">
+          {% if item.is_backlog %}<span style="background:#fef9c3;color:#854d0e;font-size:.7rem;padding:1px 6px;border-radius:999px;font-weight:600;">Backlog</span>{% endif %}
+          {% if item.is_upgraded %}<span style="background:#ede9fe;color:#6d28d9;font-size:.7rem;padding:1px 6px;border-radius:999px;font-weight:600;">Upgraded</span>{% endif %}
+          {% if item.error_message %}<span style="color:#dc2626;font-size:.75rem;">⚠ {{ item.error_message[:50] }}{% if item.error_message|length > 50 %}…{% endif %}</span>{% endif %}
+        </div>
+      </td>
+      <td style="white-space:nowrap;">{% if item.media_type == 'movie' %}🎬{% else %}📺{% endif %} {{ item.media_type | capitalize }}</td>
+      <td>{{ item.source | capitalize }}</td>
+      <td><span class="badge badge-{{ item.status }}">{{ item.status | capitalize }}</span></td>
+      <td style="white-space:nowrap;">{% if item.file_size_bytes %}{{ item.file_size_bytes | filesize }}{% else %}<span style="color:#94a3b8;">—</span>{% endif %}</td>
+      <td style="white-space:nowrap;color:#64748b;font-size:.82rem;">{{ item.updated_at.strftime('%m-%d %H:%M') }}</td>
+      <td style="white-space:nowrap;">
+        {% if item.status == 'queued' %}
+        <form method="post" action="/tracker/items/{{ item.id }}/approve" style="display:inline;">
+          <button type="submit" class="btn btn-primary" style="padding:3px 9px;font-size:.78rem;">Approve</button>
+        </form>
+        <form method="post" action="/tracker/items/{{ item.id }}/skip" style="display:inline;margin-left:.25rem;">
+          <button type="submit" class="btn btn-ghost" style="padding:3px 9px;font-size:.78rem;">Skip</button>
+        </form>
+        {% elif item.status in ('finished', 'copied', 'error') %}
+        <form method="post" action="/tracker/items/{{ item.id }}/reset" style="display:inline;">
+          <button type="submit" class="btn btn-secondary" style="padding:3px 9px;font-size:.78rem;">Re-copy</button>
+        </form>
+        {% else %}
+        <span style="color:#94a3b8;font-size:.8rem;">—</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color:#64748b;text-align:center;padding:1.5rem 0;margin:0;">No activity yet.</p>
+{% endif %}
