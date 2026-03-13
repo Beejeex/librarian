@@ -1,1 +1,0 @@
-# MadTracked application package
