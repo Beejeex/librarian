@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 from sqlmodel import Session, select
 
 from app.config import get_config, save_config
-from app.database import get_session
+from app.database import get_session_dep as get_session
 from app.log_buffer import log_buffer
 from app.models import RenameItem, ScanRun, TrackedItem
 
@@ -254,7 +254,8 @@ async def save_settings(
 # ---------------------------------------------------------------------------
 @router.get("/logs", response_class=HTMLResponse, tags=["ui"])
 async def logs_page(request: Request):
-    """Render the logs page showing cached recent log output."""
+    """Render the unified logs page (Renamer + Tracker tabs)."""
+    from app.log_buffer import get_recent_logs
     recent_lines = log_buffer.tail(200)
     templates = get_templates()
     return templates.TemplateResponse(

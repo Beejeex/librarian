@@ -32,6 +32,12 @@
             style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
       🔔 Notifications
     </button>
+    <button type="button"
+            @click="tab='danger'"
+            :style="tab==='danger' ? 'border-bottom:2px solid #ef4444;margin-bottom:-2px;color:#ef4444;' : 'color:#64748b;'"
+            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
+      ⚠ Danger Zone
+    </button>
   </div>
 
   {# ══════════════════════════════════════════════════════════ #}
@@ -336,9 +342,15 @@
       </div>
     </div>
 
-    {# Danger Zone — reset first-run flags #}
-    <div class="card" style="border-top:3px solid #ef4444;">
-      <h2 style="margin-bottom:.75rem;color:#b91c1c;">⚠ Danger Zone</h2>
+  </div>{# end Notifications tab #}
+
+  {# ══════════════════════════════════════════════════════════ #}
+  {# TAB: Danger Zone                                         #}
+  {# ══════════════════════════════════════════════════════════ #}
+  <div x-show="tab === 'danger'">
+
+    <div class="card" style="border-left:4px solid #ef4444;">
+      <h2 style="margin-bottom:.75rem;color:#b91c1c;">🔴 Reset First-Run Index</h2>
       <p style="color:#64748b;font-size:.9rem;margin-bottom:1rem;">
         Reset the first-run flag to re-run the initial backlog index on the next poll.
         All existing tracked items will be re-evaluated.
@@ -357,10 +369,10 @@
       </div>
     </div>
 
-  </div>{# end Notifications tab #}
+  </div>{# end Danger Zone tab #}
 
-  {# ── Save button (always visible) ── #}
-  <div style="display:flex;align-items:center;gap:1rem;margin-top:1.5rem;">
+  {# ── Save button (hidden on Danger Zone tab) ── #}
+  <div x-show="tab !== 'danger'" style="display:flex;align-items:center;gap:1rem;margin-top:1.5rem;">
     <button type="submit" class="btn btn-primary"
             :disabled="tab === 'librarian' && !canSave"
             :style="(tab === 'librarian' && !canSave) ? 'opacity:0.45; cursor:not-allowed;' : ''">

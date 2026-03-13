@@ -25,14 +25,11 @@
 function logStreamer(scanRunId, batchSize) {
   return {
     async start() {
-      // Kick off the apply
       await fetch('/api/apply', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ scan_run_id: scanRunId, batch_size: batchSize })
       });
-
-      // Connect to SSE stream
       const box = document.getElementById('log-output');
       const es = new EventSource('/api/stream');
       es.onmessage = (e) => {
@@ -55,18 +52,125 @@ function logStreamer(scanRunId, batchSize) {
 </script>
 
 {% else %}
-{# ── View mode ── #}
-<div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
-  <h1 style="margin:0;">Logs</h1>
-  <button class="btn btn-ghost" style="margin-left:auto;"
-    onclick="
-      fetch('/api/logs/clear', {method:'POST'})
-        .then(() => location.reload());
-    ">Clear</button>
+{# ── Unified logs view ── #}
+<h1>Logs</h1>
+
+<div x-data="unifiedLogs()" x-init="init()" @unload.window="destroy()">
+
+  {# ── Tab bar ── #}
+  <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.5rem;">
+    <button type="button"
+            @click="switchTab('renamer')"
+            :style="tab==='renamer' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
+            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
+      📚 Renamer
+    </button>
+    <button type="button"
+            @click="switchTab('tracker')"
+            :style="tab==='tracker' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
+            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
+      🗂 Tracker
+    </button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:.75rem;padding-bottom:2px;">
+      <label style="display:flex;align-items:center;gap:.35rem;font-size:.85rem;cursor:pointer;">
+        <input type="checkbox" x-model="autoScroll" style="accent-color:#3b82f6;">
+        Auto-scroll
+      </label>
+      <button class="btn btn-ghost" style="padding:5px 12px;font-size:.8rem;" @click="clearCurrent()">Clear</button>
+    </div>
+  </div>
+
+  {# ── Renamer tab ── #}
+  <div x-show="tab === 'renamer'">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <pre class="log-box" id="renamer-log-box" style="max-height:65vh;">{% if lines %}{{ lines | join('\n') }}{% else %}<span style="color:#64748b">No recent renamer output.</span>{% endif %}</pre>
+    </div>
+  </div>
+
+  {# ── Tracker tab (live SSE) ── #}
+  <div x-show="tab === 'tracker'">
+    <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem;">
+      <span x-text="connected ? 'Live' : 'Disconnected'"
+            :style="connected
+              ? 'background:#22c55e;color:#fff;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600;'
+              : 'background:#ef4444;color:#fff;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600;'">
+      </span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden;">
+      <pre class="log-box" id="tracker-log-box" style="max-height:65vh;">
+        <span x-show="trackerLines.length === 0" style="color:#64748b">Waiting for tracker log output…</span>
+        <template x-for="line in trackerLines" :key="line"><div x-text="line"></div></template>
+      </pre>
+    </div>
+  </div>
+
 </div>
 
-<div class="card" style="padding:0; overflow:hidden;">
-  <div class="log-box">{% if lines %}{{ lines | join('\n') }}{% else %}(no recent log output){% endif %}</div>
-</div>
+<script>
+function unifiedLogs() {
+  return {
+    tab: 'renamer',
+    autoScroll: true,
+    connected: false,
+    trackerLines: [],
+    _source: null,
+    _reconnectTimer: null,
+
+    init() {
+      this.connectTracker();
+    },
+
+    switchTab(t) {
+      this.tab = t;
+      if (this.autoScroll) {
+        this.$nextTick(() => this.scrollActive());
+      }
+    },
+
+    connectTracker() {
+      if (this._source) this._source.close();
+      this._source = new EventSource('/api/tracker/logs/stream');
+      this._source.onopen = () => { this.connected = true; };
+      this._source.onmessage = (e) => {
+        if (e.data) {
+          this.trackerLines.push(e.data);
+          if (this.trackerLines.length > 500) this.trackerLines.shift();
+        }
+        if (this.autoScroll && this.tab === 'tracker') {
+          this.$nextTick(() => this.scrollActive());
+        }
+      };
+      this._source.onerror = () => {
+        this.connected = false;
+        this._source.close();
+        this._reconnectTimer = setTimeout(() => this.connectTracker(), 3000);
+      };
+    },
+
+    scrollActive() {
+      const id = this.tab === 'renamer' ? 'renamer-log-box' : 'tracker-log-box';
+      const el = document.getElementById(id);
+      if (el) el.scrollTop = el.scrollHeight;
+    },
+
+    async clearCurrent() {
+      if (this.tab === 'renamer') {
+        await fetch('/api/logs/clear', { method: 'POST' });
+        const box = document.getElementById('renamer-log-box');
+        if (box) box.textContent = '';
+      } else {
+        await fetch('/api/tracker/logs/clear', { method: 'POST' });
+        this.trackerLines = [];
+      }
+    },
+
+    destroy() {
+      if (this._source) this._source.close();
+      if (this._reconnectTimer) clearTimeout(this._reconnectTimer);
+    },
+  };
+}
+</script>
+
 {% endif %}
 {% endblock %}

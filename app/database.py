@@ -67,7 +67,18 @@ def _run_migrations() -> None:
                 pass
 
 
-def get_session():
-    """FastAPI dependency: yield a DB session, close it when done."""
+def get_session() -> Session:
+    """
+    Return a new SQLModel Session bound to the shared engine.
+
+    Always use as a context manager:
+        with get_session() as session:
+            ...
+    """
+    return Session(engine)
+
+
+def get_session_dep():
+    """FastAPI dependency: yield a DB session, close it after the response."""
     with Session(engine) as session:
         yield session

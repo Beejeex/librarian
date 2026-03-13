@@ -15,7 +15,7 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
 from app.main import app
-from app.database import get_session
+from app.database import get_session_dep as get_session
 from app.models import AppConfig, RenameItem, ScanRun
 
 
