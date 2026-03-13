@@ -2,11 +2,13 @@
 {% block title %}Librarian — Renamer{% endblock %}
 
 {% block content %}
-<h1>Renamer — {{ source | capitalize }}</h1>
+<h1>Renamer</h1>
 
+{# Reusable macro for one source's panel #}
+{% macro source_panel(label, icon, src_key, scan_run, items, batch_size) %}
 {% if not scan_run %}
 <div class="card">
-  <p style="color:#64748b;">No scan results found for <strong>{{ source }}</strong>. <a href="/">Run a scan first.</a></p>
+  <p style="color:#64748b;">No scan results for <strong>{{ label }}</strong>. <a href="/">Run a scan first.</a></p>
 </div>
 {% elif scan_run.status == "scanning" %}
 <div class="card" x-data="{}" x-init="setTimeout(() => location.reload(), 2000)">
@@ -14,19 +16,16 @@
 </div>
 {% elif items | length == 0 %}
 <div class="card">
-  <div class="alert alert-success">Everything looks good — no folder mismatches found.</div>
-  <a href="/" class="btn btn-ghost">Back to Dashboard</a>
+  <div class="alert alert-success">{{ icon }} {{ label }} — no folder mismatches found.</div>
 </div>
 {% else %}
-
 <div x-data="{
   batchSize: {{ batch_size }},
   scanRunId: {{ scan_run.id }},
   applying: false,
   async approveAll() {
     await fetch('/api/items/approve-all', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({scan_run_id: this.scanRunId})
     });
     location.reload();
@@ -34,37 +33,28 @@
   async startApply() {
     this.applying = true;
     await fetch('/api/apply', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({scan_run_id: this.scanRunId, batch_size: this.batchSize})
     });
     window.location = '/apply?scan_run_id=' + this.scanRunId + '&batch_size=' + this.batchSize;
   }
 }">
-
-  <div class="card" style="display:flex; align-items:center; gap:1rem; flex-wrap:wrap; padding:1rem 1.5rem;">
-    <span style="font-size:0.875rem; color:#64748b;">
+  <div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;">
+    <span style="font-size:.875rem;color:#64748b;">
       <strong>{{ items | length }}</strong> item(s) &nbsp;·&nbsp;
       <strong>{{ items | selectattr('status','eq','approved') | list | length }}</strong> approved
     </span>
-
-    <div style="display:flex; align-items:center; gap:8px; margin-left:auto;">
-      <label style="font-size:0.875rem; font-weight:600; margin:0;">Batch size:</label>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+      <label style="font-size:.875rem;font-weight:600;margin:0;">Batch:</label>
       <input type="number" x-model.number="batchSize" min="1" max="500"
-             style="width:80px; padding:6px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.875rem;">
+             style="width:72px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;">
     </div>
-
     <button class="btn btn-ghost" @click="approveAll()">Approve All</button>
-
-    <button class="btn btn-success"
-      :disabled="applying"
-      @click="startApply()">
-      <span x-show="!applying">Apply</span>
-      <span x-show="applying">Starting…</span>
+    <button class="btn btn-success" :disabled="applying" @click="startApply()">
+      <span x-show="!applying">Apply</span><span x-show="applying">Starting…</span>
     </button>
   </div>
-
-  <div class="card" style="padding:0; overflow:hidden;">
+  <div class="card" style="padding:0;overflow:hidden;">
     <table>
       <thead>
         <tr>
@@ -77,50 +67,54 @@
       </thead>
       <tbody>
         {% for item in items %}
-        <tr id="row-{{ item.id }}"
+        <tr id="row-{{ item.id }}-{{ src_key }}"
             x-data="{ status: '{{ item.status }}' }"
             :style="status === 'skipped' ? 'opacity:0.45' : ''">
-          <td style="font-family:monospace; font-size:0.8rem; word-break:break-all;">{{ item.current_folder }}</td>
-          <td style="font-family:monospace; font-size:0.8rem; word-break:break-all; color:#0f172a; font-weight:500;">{{ item.expected_folder }}</td>
+          <td style="font-family:monospace;font-size:.8rem;word-break:break-all;">{{ item.current_folder }}</td>
+          <td style="font-family:monospace;font-size:.8rem;word-break:break-all;color:#0f172a;font-weight:500;">{{ item.expected_folder }}</td>
           <td>
             {% set sc = item.disk_scenario %}
             {% if sc == 'rename' %}
-              <span title="Disk rename + arr update" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#dbeafe; color:#1d4ed8;">rename</span>
+              <span title="Disk rename + arr update" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#dbeafe;color:#1d4ed8;">rename</span>
             {% elif sc == 'arr_only' %}
-              <span title="Folder already correct on disk — arr path update only" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#dcfce7; color:#16a34a;">arr only</span>
+              <span title="Folder already correct on disk — arr path update only" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#dcfce7;color:#16a34a;">arr only</span>
             {% elif sc == 'collision' %}
-              <span title="Both folders exist on disk — resolve manually before approving" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#fee2e2; color:#dc2626;">⚠ collision</span>
+              <span title="Both folders exist — resolve manually" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#fee2e2;color:#dc2626;">⚠ collision</span>
             {% elif sc == 'missing' %}
-              <span title="Source folder not found on disk" style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; background:#fef9c3; color:#92400e;">missing</span>
+              <span title="Source folder not found on disk" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#fef9c3;color:#92400e;">missing</span>
             {% else %}
-              <span style="display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; color:#94a3b8;">—</span>
+              <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;color:#94a3b8;">—</span>
             {% endif %}
           </td>
-          <td>
-            <span class="badge"
-              :class="'badge-' + status"
-              x-text="status"></span>
-          </td>
+          <td><span class="badge" :class="'badge-' + status" x-text="status"></span></td>
           <td style="white-space:nowrap;">
-            <button class="btn btn-ghost" style="padding:4px 10px; font-size:0.8rem;"
-              x-show="status !== 'approved'"
-              @click="
-                fetch('/api/items/{{ item.id }}/approve', {method:'POST'})
-                  .then(() => { status = 'approved'; });
-              ">Approve</button>
-            <button class="btn btn-ghost" style="padding:4px 10px; font-size:0.8rem; color:#ef4444;"
-              x-show="status !== 'skipped'"
-              @click="
-                fetch('/api/items/{{ item.id }}/skip', {method:'POST'})
-                  .then(() => { status = 'skipped'; });
-              ">Skip</button>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:.8rem;" x-show="status !== 'approved'"
+              @click="fetch('/api/items/{{ item.id }}/approve',{method:'POST'}).then(()=>{status='approved';})">Approve</button>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:.8rem;color:#ef4444;" x-show="status !== 'skipped'"
+              @click="fetch('/api/items/{{ item.id }}/skip',{method:'POST'}).then(()=>{status='skipped';})">Skip</button>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-
 </div>
 {% endif %}
+{% endmacro %}
+
+{# ── Tab bar ── #}
+<div x-data="{ tab: '{{ active_source }}' }">
+  <div class="tab-nav">
+    <button type="button" class="tab-btn" :class="tab==='radarr' ? 'tab-active' : ''" @click="tab='radarr'">🎬 Radarr</button>
+    <button type="button" class="tab-btn" :class="tab==='sonarr' ? 'tab-active' : ''" @click="tab='sonarr'">📺 Sonarr</button>
+  </div>
+
+  <div x-show="tab === 'radarr'">
+    {{ source_panel('Radarr', '🎬', 'radarr', radarr_run, radarr_items, batch_size) }}
+  </div>
+  <div x-show="tab === 'sonarr'">
+    {{ source_panel('Sonarr', '📺', 'sonarr', sonarr_run, sonarr_items, batch_size) }}
+  </div>
+</div>
 {% endblock %}
+

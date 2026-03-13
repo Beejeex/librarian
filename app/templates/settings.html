@@ -13,31 +13,11 @@
       @submit="onSubmit">
 
   {# ── Tab navigation ── #}
-  <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.5rem;">
-    <button type="button"
-            @click="tab='librarian'"
-            :style="tab==='librarian' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
-            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
-      📚 Librarian
-    </button>
-    <button type="button"
-            @click="tab='tracker'"
-            :style="tab==='tracker' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
-            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
-      🗂 Tracker
-    </button>
-    <button type="button"
-            @click="tab='notifications'"
-            :style="tab==='notifications' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
-            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
-      🔔 Notifications
-    </button>
-    <button type="button"
-            @click="tab='danger'"
-            :style="tab==='danger' ? 'border-bottom:2px solid #ef4444;margin-bottom:-2px;color:#ef4444;' : 'color:#64748b;'"
-            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
-      ⚠ Danger Zone
-    </button>
+  <div class="tab-nav">
+    <button type="button" class="tab-btn" :class="tab==='librarian' ? 'tab-active' : ''" @click="tab='librarian'">📚 Librarian</button>
+    <button type="button" class="tab-btn" :class="tab==='tracker'   ? 'tab-active' : ''" @click="tab='tracker'">🗂 Tracker</button>
+    <button type="button" class="tab-btn" :class="tab==='notifications' ? 'tab-active' : ''" @click="tab='notifications'">🔔 Notifications</button>
+    <button type="button" class="tab-btn tab-danger" :class="tab==='danger' ? 'tab-active' : ''" @click="tab='danger'">⚠ Danger Zone</button>
   </div>
 
   {# ══════════════════════════════════════════════════════════ #}

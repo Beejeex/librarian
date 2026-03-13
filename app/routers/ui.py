@@ -90,40 +90,45 @@ async def review(
     session: Session = Depends(get_session),
 ):
     """
-    Render the review page: mismatch table with approve/skip toggles.
-
-    Defaults to showing the latest scan run for the given source.
+    Render the review page: tabs for Radarr and Sonarr mismatches side by side.
+    The `source` query param pre-selects the active tab.
     """
     config = get_config(session)
 
-    scan_run = session.exec(
-        select(ScanRun)
-        .where(ScanRun.source == source)
-        .order_by(ScanRun.id.desc())  # type: ignore[arg-type]
-        .limit(1)
-    ).first()
+    def _scan_data(src: str) -> tuple:
+        run = session.exec(
+            select(ScanRun)
+            .where(ScanRun.source == src)
+            .order_by(ScanRun.id.desc())  # type: ignore[arg-type]
+            .limit(1)
+        ).first()
+        items: list[RenameItem] = []
+        if run:
+            items = list(
+                session.exec(
+                    select(RenameItem)
+                    .where(
+                        RenameItem.scan_run_id == run.id,
+                        RenameItem.status.in_(("pending", "approved", "skipped")),  # type: ignore[attr-defined]
+                    )
+                    .order_by(RenameItem.id)  # type: ignore[arg-type]
+                ).all()
+            )
+        return run, items
 
-    items: list[RenameItem] = []
-    if scan_run:
-        items = list(
-            session.exec(
-                select(RenameItem)
-                .where(
-                    RenameItem.scan_run_id == scan_run.id,
-                    RenameItem.status.in_(("pending", "approved", "skipped")),  # type: ignore[attr-defined]
-                )
-                .order_by(RenameItem.id)  # type: ignore[arg-type]
-            ).all()
-        )
+    radarr_run, radarr_items = _scan_data("radarr")
+    sonarr_run, sonarr_items = _scan_data("sonarr")
 
     templates = get_templates()
     return templates.TemplateResponse(
         "review.html",
         {
             "request": request,
-            "source": source,
-            "scan_run": scan_run,
-            "items": items,
+            "active_source": source if source in ("radarr", "sonarr") else "radarr",
+            "radarr_run": radarr_run,
+            "radarr_items": radarr_items,
+            "sonarr_run": sonarr_run,
+            "sonarr_items": sonarr_items,
             "batch_size": config.batch_size,
         },
     )
