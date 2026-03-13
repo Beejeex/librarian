@@ -181,6 +181,7 @@
     <a href="/tracker" {% if request.url.path.startswith("/tracker") %}class="active"{% endif %}>Tracker</a>
     <a href="/logs" {% if request.url.path == "/logs" %}class="active"{% endif %}>Logs</a>
     <a href="/settings" {% if request.url.path == "/settings" %}class="active"{% endif %}>Settings</a>
+    <span style="margin-left:auto;color:#64748b;font-size:.78rem;font-weight:500;letter-spacing:.02em;">{{ VERSION }}</span>
   </nav>
   <div class="page">
     {% block content %}{% endblock %}

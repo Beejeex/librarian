@@ -16,6 +16,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
 
+from app.version import VERSION
+
 import logging
 
 from app.config import load_config
@@ -36,6 +38,7 @@ TEMPLATES_DIR = BASE_DIR / "templates"
 
 # Shared Jinja2 templates instance — imported by routers
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+templates.env.globals["VERSION"] = VERSION
 
 
 # ---------------------------------------------------------------------------
