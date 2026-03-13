@@ -96,7 +96,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Librarian",
     description="Radarr / Sonarr library manager with media tracker",
-    version="0.1.0",
+    version=VERSION,
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url=None,
