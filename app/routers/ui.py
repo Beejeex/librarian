@@ -196,8 +196,8 @@ async def save_settings(
     # Librarian — General
     batch_size: int = Form(20),
     # Tracker
-    radarr_tags: str = Form(""),
-    sonarr_tags: str = Form(""),
+    radarr_tags: list[str] = Form([]),
+    sonarr_tags: list[str] = Form([]),
     poll_interval_minutes: int = Form(15),
     max_concurrent_copies: int = Form(2),
     max_share_size_gb: float = Form(0.0),
@@ -226,8 +226,8 @@ async def save_settings(
             "sonarr_root_folder": sonarr_root_folder,
             "sonarr_folder_format": sonarr_folder_format,
             "batch_size": batch_size,
-            "radarr_tags": radarr_tags,
-            "sonarr_tags": sonarr_tags,
+            "radarr_tags": ", ".join(radarr_tags),
+            "sonarr_tags": ", ".join(sonarr_tags),
             "poll_interval_minutes": poll_interval_minutes,
             "max_concurrent_copies": max_concurrent_copies,
             "max_share_size_gb": max_share_size_gb,

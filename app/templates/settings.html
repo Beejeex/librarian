@@ -170,30 +170,60 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
 
       {# ── Radarr tags ── #}
-      <div class="card">
+      <div class="card" x-data="{ tagLoaded: false }">
         <h2 style="margin-bottom:1.25rem;">🎬 Radarr Tracker Tags</h2>
         <div class="form-group">
-          <label for="radarr_tags">Tags to track</label>
-          <input type="text" id="radarr_tags" name="radarr_tags"
-                 value="{{ config.radarr_tags }}"
-                 placeholder="e.g. share, seed">
+          <label>Tags to track</label>
+          <div style="display:flex;gap:.5rem;align-items:flex-start;">
+            <template x-if="!tagLoaded">
+              <input type="text" id="radarr_tags_text" name="radarr_tags"
+                     value="{{ config.radarr_tags }}"
+                     placeholder="e.g. share, seed"
+                     style="flex:1;">
+            </template>
+            <div id="radarr-tag-picker" x-show="tagLoaded" style="flex:1;"></div>
+            <button type="button" class="btn btn-secondary"
+                    style="white-space:nowrap;"
+                    hx-get="/api/tracker/radarr/tags"
+                    hx-target="#radarr-tag-picker"
+                    hx-swap="innerHTML"
+                    hx-vals='js:{"radarr_url": document.getElementById("radarr_url")?.value || "", "radarr_api_key": document.getElementById("radarr_api_key")?.value || "", "selected": getTagSelected("radarr_tags_tracker", "radarr_tags_text")}'
+                    @click="tagLoaded = true">
+              Load Tags
+            </button>
+          </div>
           <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
-            Comma-separated tag names. Movies with any of these tags are copied to the share.
+            Click <strong>Load Tags</strong> to choose from existing Radarr tags, or type comma-separated.
             Leave empty to disable Radarr tracking.
           </p>
         </div>
       </div>
 
       {# ── Sonarr tags ── #}
-      <div class="card">
+      <div class="card" x-data="{ tagLoaded: false }">
         <h2 style="margin-bottom:1.25rem;">📺 Sonarr Tracker Tags</h2>
         <div class="form-group">
-          <label for="sonarr_tags">Tags to track</label>
-          <input type="text" id="sonarr_tags" name="sonarr_tags"
-                 value="{{ config.sonarr_tags }}"
-                 placeholder="e.g. share, seed">
+          <label>Tags to track</label>
+          <div style="display:flex;gap:.5rem;align-items:flex-start;">
+            <template x-if="!tagLoaded">
+              <input type="text" id="sonarr_tags_text" name="sonarr_tags"
+                     value="{{ config.sonarr_tags }}"
+                     placeholder="e.g. share, seed"
+                     style="flex:1;">
+            </template>
+            <div id="sonarr-tag-picker" x-show="tagLoaded" style="flex:1;"></div>
+            <button type="button" class="btn btn-secondary"
+                    style="white-space:nowrap;"
+                    hx-get="/api/tracker/sonarr/tags"
+                    hx-target="#sonarr-tag-picker"
+                    hx-swap="innerHTML"
+                    hx-vals='js:{"sonarr_url": document.getElementById("sonarr_url")?.value || "", "sonarr_api_key": document.getElementById("sonarr_api_key")?.value || "", "selected": getTagSelected("sonarr_tags_tracker", "sonarr_tags_text")}'
+                    @click="tagLoaded = true">
+              Load Tags
+            </button>
+          </div>
           <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
-            Comma-separated tag names. Series episodes with any of these tags are copied.
+            Click <strong>Load Tags</strong> to choose from existing Sonarr tags, or type comma-separated.
             Leave empty to disable Sonarr tracking.
           </p>
         </div>
@@ -366,6 +396,12 @@
 </form>
 
 <script>
+function getTagSelected(selectId, textId) {
+  const sel = document.getElementById(selectId);
+  if (sel) return Array.from(sel.selectedOptions).map(o => o.value).join(',');
+  return document.getElementById(textId)?.value || '';
+}
+
 function settingsApp() {
   return {
     tab: 'librarian',
