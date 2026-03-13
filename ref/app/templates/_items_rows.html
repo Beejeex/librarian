@@ -1,0 +1,41 @@
+{% for item in items %}
+<tr x-cloak
+    data-title="{{ item.title | lower }}"
+    x-show="(filter === 'all' || filter === '{{ item.status }}') && (search === '' || $el.dataset.title.includes(search.toLowerCase()))">
+    <td>
+        <span>{{ item.title }}</span>
+        {% if item.is_backlog %}
+        <span style="font-size:.7rem;background:#fef3c7;color:#92400e;padding:.1em .4em;border-radius:999px;margin-left:.35rem">backlog</span>
+        {% endif %}
+        {% if item.is_upgraded %}
+        <span style="font-size:.7rem;background:#dbeafe;color:#1e40af;padding:.1em .4em;border-radius:999px;margin-left:.35rem">upgraded</span>
+        {% endif %}
+        {% if item.error_message %}
+        <br><small style="color:#f87171">{{ item.error_message }}</small>
+        {% endif %}
+    </td>
+    <td>{{ item.media_type }}</td>
+    <td>{{ item.source }}</td>
+    <td><code style="font-size:.78rem">{{ item.tag }}</code></td>
+    <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
+    <td style="white-space:nowrap;color:#64748b;font-size:.82rem">{{ item.file_size_bytes | filesize }}</td>
+    <td>{{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    <td style="white-space:nowrap">
+        {% if item.status == "queued" %}
+        <button class="btn btn-sm btn-primary" style="margin-right:.25rem"
+                hx-post="/items/{{ item.id }}/approve"
+                hx-target="body" hx-swap="outerHTML">Approve</button>
+        <button class="btn btn-sm btn-secondary"
+                hx-post="/items/{{ item.id }}/skip"
+                hx-confirm="Permanently skip this item? It will be marked finished."
+                hx-target="body" hx-swap="outerHTML">Skip</button>
+        {% elif item.status in ("finished", "copied", "error") %}
+        <button class="btn btn-sm btn-danger"
+                hx-post="/items/{{ item.id }}/reset"
+                hx-confirm="Re-copy this item on next poll?"
+                hx-target="body" hx-swap="outerHTML"
+        >{% if item.status == "copied" %}Re-copy{% else %}Reset{% endif %}</button>
+        {% endif %}
+    </td>
+</tr>
+{% endfor %}

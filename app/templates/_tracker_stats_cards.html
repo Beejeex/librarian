@@ -1,0 +1,40 @@
+{% set total = (counts.queued or 0) + (counts.pending or 0) + (counts.copying or 0) + (counts.copied or 0) + (counts.finished or 0) + (counts.error or 0) %}
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:1rem;">
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #94a3b8;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ total }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Total</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #f59e0b;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ counts.queued or 0 }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Queued</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #64748b;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ counts.pending or 0 }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Pending</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #a855f7;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ counts.copying or 0 }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Copying</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #3b82f6;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ counts.copied or 0 }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Copied</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #22c55e;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ counts.finished or 0 }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Finished</div>
+  </div>
+
+  <div class="card" style="text-align:center;padding:1rem .75rem;border-top:4px solid #ef4444;">
+    <div style="font-size:1.9rem;font-weight:700;color:#1e293b;">{{ counts.error or 0 }}</div>
+    <div style="font-size:.8rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.04em;">Error</div>
+  </div>
+
+</div>

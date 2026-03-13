@@ -5,6 +5,9 @@ httpx
 sse-starlette
 jinja2
 python-multipart
+apscheduler==3.11.0
+watchdog==6.0.0
+aiosqlite
 pytest
 pytest-asyncio
 pytest-httpx

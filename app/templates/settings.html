@@ -12,6 +12,33 @@
       x-data="settingsApp()"
       @submit="onSubmit">
 
+  {# ── Tab navigation ── #}
+  <div style="display:flex;gap:0;border-bottom:2px solid #e2e8f0;margin-bottom:1.5rem;">
+    <button type="button"
+            @click="tab='librarian'"
+            :style="tab==='librarian' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
+            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
+      📚 Librarian
+    </button>
+    <button type="button"
+            @click="tab='tracker'"
+            :style="tab==='tracker' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
+            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
+      🗂 Tracker
+    </button>
+    <button type="button"
+            @click="tab='notifications'"
+            :style="tab==='notifications' ? 'border-bottom:2px solid #3b82f6;margin-bottom:-2px;color:#3b82f6;' : 'color:#64748b;'"
+            style="background:none;border:none;padding:.6rem 1.25rem;font-size:.95rem;font-weight:600;cursor:pointer;">
+      🔔 Notifications
+    </button>
+  </div>
+
+  {# ══════════════════════════════════════════════════════════ #}
+  {# TAB: Librarian                                            #}
+  {# ══════════════════════════════════════════════════════════ #}
+  <div x-show="tab === 'librarian'">
+
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.5rem;">
 
     {# ── Radarr ── #}
@@ -147,14 +174,199 @@
     </div>
   </div>
 
-  {# Save — disabled until untested URLs have been tested #}
-  <div style="display:flex; align-items:center; gap:1rem;">
+  </div>{# end Librarian tab #}
+
+  {# ══════════════════════════════════════════════════════════ #}
+  {# TAB: Tracker                                              #}
+  {# ══════════════════════════════════════════════════════════ #}
+  <div x-show="tab === 'tracker'">
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+
+      {# ── Radarr tags ── #}
+      <div class="card">
+        <h2 style="margin-bottom:1.25rem;">🎬 Radarr Tracker Tags</h2>
+        <div class="form-group">
+          <label for="radarr_tags">Tags to track</label>
+          <input type="text" id="radarr_tags" name="radarr_tags"
+                 value="{{ config.radarr_tags }}"
+                 placeholder="e.g. share, seed">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
+            Comma-separated tag names. Movies with any of these tags are copied to the share.
+            Leave empty to disable Radarr tracking.
+          </p>
+        </div>
+      </div>
+
+      {# ── Sonarr tags ── #}
+      <div class="card">
+        <h2 style="margin-bottom:1.25rem;">📺 Sonarr Tracker Tags</h2>
+        <div class="form-group">
+          <label for="sonarr_tags">Tags to track</label>
+          <input type="text" id="sonarr_tags" name="sonarr_tags"
+                 value="{{ config.sonarr_tags }}"
+                 placeholder="e.g. share, seed">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
+            Comma-separated tag names. Series episodes with any of these tags are copied.
+            Leave empty to disable Sonarr tracking.
+          </p>
+        </div>
+      </div>
+
+    </div>
+
+    {# ── Tracker behaviour ── #}
+    <div class="card">
+      <h2 style="margin-bottom:1.25rem;">Behaviour</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1.5rem;">
+
+        <div class="form-group">
+          <label for="poll_interval_minutes">Poll Interval (minutes)</label>
+          <input type="number" id="poll_interval_minutes" name="poll_interval_minutes"
+                 value="{{ config.poll_interval_minutes }}" min="1" max="1440">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">How often to check for new tagged items.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="max_concurrent_copies">Max Concurrent Copies</label>
+          <input type="number" id="max_concurrent_copies" name="max_concurrent_copies"
+                 value="{{ config.max_concurrent_copies }}" min="1" max="20">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">Files copied in parallel per poll cycle.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="max_share_size_gb">Max Share Size (GB)</label>
+          <input type="number" id="max_share_size_gb" name="max_share_size_gb"
+                 value="{{ config.max_share_size_gb }}" min="0" step="0.1">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;"><code>0</code> = unlimited.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="max_share_files">Max Share Files</label>
+          <input type="number" id="max_share_files" name="max_share_files"
+                 value="{{ config.max_share_files }}" min="0">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;"><code>0</code> = unlimited.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="share_path">Share Path</label>
+          <input type="text" id="share_path" name="share_path"
+                 value="{{ config.share_path }}" placeholder="/share">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">Mount point for copy destination.</p>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1rem;display:flex;align-items:center;gap:.75rem;">
+        <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+          <input type="checkbox" id="require_approval" name="require_approval"
+                 value="true" {% if config.require_approval %}checked{% endif %}
+                 style="accent-color:#3b82f6;width:16px;height:16px;">
+          Require approval for new items
+        </label>
+        <p style="font-size:.8rem;color:#94a3b8;margin:0;">
+          When enabled, newly detected items land as <em>Queued</em> and must be approved before copying.
+        </p>
+      </div>
+    </div>
+
+  </div>{# end Tracker tab #}
+
+  {# ══════════════════════════════════════════════════════════ #}
+  {# TAB: Notifications                                        #}
+  {# ══════════════════════════════════════════════════════════ #}
+  <div x-show="tab === 'notifications'">
+
+    <div class="card">
+      <h2 style="margin-bottom:1.25rem;">🔔 ntfy.sh Notifications</h2>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
+
+        <div class="form-group">
+          <label for="ntfy_url">ntfy Server URL</label>
+          <input type="text" id="ntfy_url" name="ntfy_url"
+                 value="{{ config.ntfy_url }}" placeholder="https://ntfy.sh">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">Use your self-hosted URL or leave as <code>https://ntfy.sh</code>.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="ntfy_topic">Topic</label>
+          <input type="text" id="ntfy_topic" name="ntfy_topic"
+                 value="{{ config.ntfy_topic }}" placeholder="my-librarian-topic">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">Leave empty to disable notifications.</p>
+        </div>
+
+        <div class="form-group">
+          <label for="ntfy_token">Bearer Token (optional)</label>
+          <input type="password" id="ntfy_token" name="ntfy_token"
+                 value="{{ config.ntfy_token }}" placeholder="tk_…">
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">For private ntfy topics requiring authentication.</p>
+        </div>
+
+      </div>
+
+      <div style="margin-top:1.25rem;">
+        <p style="font-weight:600;margin-bottom:.75rem;">Notify on:</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" name="ntfy_on_copied" value="true"
+                   {% if config.ntfy_on_copied %}checked{% endif %}
+                   style="accent-color:#3b82f6;width:16px;height:16px;">
+            File copied
+          </label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" name="ntfy_on_error" value="true"
+                   {% if config.ntfy_on_error %}checked{% endif %}
+                   style="accent-color:#3b82f6;width:16px;height:16px;">
+            Copy error
+          </label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" name="ntfy_on_finished" value="true"
+                   {% if config.ntfy_on_finished %}checked{% endif %}
+                   style="accent-color:#3b82f6;width:16px;height:16px;">
+            File deleted from share
+          </label>
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
+            <input type="checkbox" name="ntfy_on_first_run" value="true"
+                   {% if config.ntfy_on_first_run %}checked{% endif %}
+                   style="accent-color:#3b82f6;width:16px;height:16px;">
+            First-run index complete
+          </label>
+        </div>
+      </div>
+    </div>
+
+    {# Danger Zone — reset first-run flags #}
+    <div class="card" style="border-top:3px solid #ef4444;">
+      <h2 style="margin-bottom:.75rem;color:#b91c1c;">⚠ Danger Zone</h2>
+      <p style="color:#64748b;font-size:.9rem;margin-bottom:1rem;">
+        Reset the first-run flag to re-run the initial backlog index on the next poll.
+        All existing tracked items will be re-evaluated.
+      </p>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+        <a href="/api/tracker/reset-first-run?source=radarr"
+           onclick="return confirm('Reset Radarr first-run flag? The next poll will re-index all tagged movies as backlog.')"
+           class="btn btn-danger" style="font-size:.85rem;">
+          Reset Radarr First-Run
+        </a>
+        <a href="/api/tracker/reset-first-run?source=sonarr"
+           onclick="return confirm('Reset Sonarr first-run flag? The next poll will re-index all tagged episodes as backlog.')"
+           class="btn btn-danger" style="font-size:.85rem;">
+          Reset Sonarr First-Run
+        </a>
+      </div>
+    </div>
+
+  </div>{# end Notifications tab #}
+
+  {# ── Save button (always visible) ── #}
+  <div style="display:flex;align-items:center;gap:1rem;margin-top:1.5rem;">
     <button type="submit" class="btn btn-primary"
-            :disabled="!canSave"
-            :style="!canSave ? 'opacity:0.45; cursor:not-allowed;' : ''">
+            :disabled="tab === 'librarian' && !canSave"
+            :style="(tab === 'librarian' && !canSave) ? 'opacity:0.45; cursor:not-allowed;' : ''">
       Save Settings
     </button>
-    <span x-show="!canSave" style="color:#94a3b8; font-size:0.85rem;">
+    <span x-show="tab === 'librarian' && !canSave" style="color:#94a3b8;font-size:.85rem;">
       Test the connection first to enable Save.
     </span>
   </div>
@@ -164,36 +376,28 @@
 <script>
 function settingsApp() {
   return {
-    // Current field values (tracked so we can detect changes after a test)
+    tab: 'librarian',
+
+    // Librarian tab tracking state
     radarrUrl:  {{ config.radarr_url | tojson }},
     radarrKey:  {{ config.radarr_api_key | tojson }},
     sonarrUrl:  {{ config.sonarr_url | tojson }},
     sonarrKey:  {{ config.sonarr_api_key | tojson }},
-
-    // Folder formats — updated by test connection or typed manually
     radarrFolderFormat: {{ config.radarr_folder_format | tojson }},
     sonarrFolderFormat: {{ config.sonarr_folder_format | tojson }},
-
-    // The URL/key values at the time of the last successful test.
-    // If current values differ, the test is considered stale.
     radarrTestedUrl: {{ config.radarr_url | tojson }},
     radarrTestedKey: {{ config.radarr_api_key | tojson }},
     sonarrTestedUrl: {{ config.sonarr_url | tojson }},
     sonarrTestedKey: {{ config.sonarr_api_key | tojson }},
-
-    // true if the current URL/key have been successfully tested
     radarrTested: {{ 'true' if config.radarr_url else 'false' }},
     sonarrTested: {{ 'true' if config.sonarr_url else 'false' }},
-
     radarrTesting: false,
     sonarrTesting: false,
-    radarrStatus: null,   // null | 'ok' | 'error'
+    radarrStatus: null,
     sonarrStatus: null,
     radarrError: '',
     sonarrError: '',
 
-    // Needs a test when URL is non-empty and either hasn't been tested yet
-    // or the URL/key have changed since the last test.
     get radarrNeedsTest() {
       return !!this.radarrUrl && (
         !this.radarrTested ||
@@ -274,9 +478,8 @@ function settingsApp() {
       }
     },
 
-    // Prevent form submission if Save is disabled (belt-and-suspenders)
     onSubmit(e) {
-      if (!this.canSave) e.preventDefault();
+      if (this.tab === 'librarian' && !this.canSave) e.preventDefault();
     }
   }
 }

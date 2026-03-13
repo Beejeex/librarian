@@ -1,0 +1,53 @@
+<h2 style="margin-top:0">Recent Activity</h2>
+{% if recent %}
+<table>
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Type</th>
+            <th>Source</th>
+            <th>Status</th>
+            <th>Size</th>
+            <th>Updated</th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for item in recent %}
+        <tr>
+            <td>
+                {{ item.title }}
+                {% if item.is_backlog %}<span style="font-size:.7rem;background:#fef3c7;color:#92400e;padding:.1em .4em;border-radius:999px;margin-left:.35rem">backlog</span>{% endif %}
+                {% if item.error_message %}
+                <br><small style="color:#f87171">{{ item.error_message }}</small>
+                {% endif %}
+            </td>
+            <td>{{ item.media_type }}</td>
+            <td>{{ item.source }}</td>
+            <td><span class="badge badge-{{ item.status }}">{{ item.status }}</span></td>
+            <td style="white-space:nowrap;color:#64748b;font-size:.82rem">{{ item.file_size_bytes | filesize }}</td>
+            <td>{{ item.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+            <td style="white-space:nowrap">
+                {% if item.status == "queued" %}
+                <button class="btn btn-sm btn-primary" style="margin-right:.25rem"
+                        hx-post="/items/{{ item.id }}/approve" hx-swap="none"
+                        hx-on::after-request="window.location.reload()">Approve</button>
+                <button class="btn btn-sm btn-secondary"
+                        hx-post="/items/{{ item.id }}/skip" hx-swap="none"
+                        hx-confirm="Permanently skip this item?"
+                        hx-on::after-request="window.location.reload()">Skip</button>
+                {% elif item.status in ("finished", "copied", "error") %}
+                <button class="btn btn-sm btn-danger"
+                        hx-post="/items/{{ item.id }}/reset"
+                        hx-confirm="Re-copy this item on next poll?"
+                        hx-target="body" hx-swap="outerHTML"
+                >{% if item.status == "copied" %}Re-copy{% else %}Reset{% endif %}</button>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color:#94a3b8;margin:0">No items tracked yet. Configure Radarr/Sonarr and wait for the first poll.</p>
+{% endif %}

@@ -104,6 +104,11 @@
     .badge-scanning { background: #e0f2fe; color: #0369a1; }
     .badge-ready    { background: #d1fae5; color: #065f46; }
     .badge-applying { background: #fef3c7; color: #92400e; }
+    /* ── Tracker status badges ── */
+    .badge-queued   { background: #fef3c7; color: #92400e; }
+    .badge-copying  { background: #ede9fe; color: #5b21b6; }
+    .badge-copied   { background: #dbeafe; color: #1e40af; }
+    .badge-finished { background: #d1fae5; color: #065f46; }
 
     /* ── Table ── */
     table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
@@ -175,6 +180,8 @@
     <a href="/review" {% if request.url.path == "/review" %}class="active"{% endif %}>Review</a>
     <a href="/settings" {% if request.url.path == "/settings" %}class="active"{% endif %}>Settings</a>
     <a href="/logs" {% if request.url.path == "/logs" %}class="active"{% endif %}>Logs</a>
+    <span style="color:#475569; padding: 0 4px;">|</span>
+    <a href="/tracker" {% if request.url.path.startswith("/tracker") %}class="active"{% endif %}>🗂 Tracker</a>
   </nav>
   <div class="page">
     {% block content %}{% endblock %}

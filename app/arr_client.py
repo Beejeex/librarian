@@ -34,19 +34,35 @@ class BaseArrClient:
             "Content-Type": "application/json",
         }
 
-    async def get(self, path: str) -> dict | list:
+    async def get(self, path: str, params: dict | None = None) -> dict | list:
         """
         Perform an authenticated GET request.
         Returns parsed JSON. Raises httpx.HTTPStatusError on non-2xx.
         """
         url = f"{self._base_url}{path}"
         async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
-            response = await client.get(url, headers=self._headers)
+            response = await client.get(url, headers=self._headers, params=params)
         if not response.is_success:
             # Log URL and status but never the API key
             logger.error("GET %s returned %s", url, response.status_code)
             response.raise_for_status()
         return response.json()
+
+    async def resolve_tag_id(self, tag_name: str) -> int | None:
+        """
+        Resolve a tag name string to its numeric tag ID in the arr application.
+
+        Returns None if the tag doesn't exist or the API call fails.
+        Case-insensitive match so UI input doesn't need exact casing.
+        """
+        tags = await self.get("/api/v3/tag")
+        if not tags:
+            return None
+        for tag in tags:
+            if tag.get("label", "").lower() == tag_name.lower():
+                return tag["id"]
+        logger.warning("Tag '%s' not found in arr instance at %s", tag_name, self._base_url)
+        return None
 
     async def put(self, path: str, body: dict) -> dict:
         """

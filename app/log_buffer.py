@@ -1,12 +1,18 @@
 """
 log_buffer.py — In-memory bounded log line store.
 
-Provides a thread-safe deque of recent log lines written during an apply run.
-The SSE endpoint reads from this buffer to stream live output to the browser.
+Provides a thread-safe deque of recent log lines written during an apply run
+or a tracker poll cycle.  The SSE endpoints read from this buffer to stream
+live output to the browser.
 
-A single global instance `log_buffer` is used throughout the application.
+A single global instance `log_buffer` services both the Renamer apply stream
+and the Tracker log stream.  A Python logging.Handler subclass (LogHandler)
+pushes log records from the standard library logging system into this buffer
+so scheduler/watcher output appears in the UI automatically.
 """
 
+import asyncio
+import logging
 import threading
 from collections import deque
 
@@ -15,18 +21,36 @@ class LogBuffer:
     """
     Thread-safe bounded buffer of log lines.
 
-    Written to by renamer.py during apply; read by the SSE endpoint.
+    Written to by renamer.py during apply and by LogHandler for all logger
+    output; read by the SSE endpoints.
     Old lines are automatically discarded when maxlen is reached.
     """
 
     def __init__(self, maxlen: int = 500) -> None:
         self._buffer: deque[str] = deque(maxlen=maxlen)
         self._lock = threading.Lock()
+        # Async listeners: a list of asyncio.Queue objects — one per SSE client.
+        # Each write fans out to all active queues.
+        self._queues: list[asyncio.Queue] = []
+        self._queues_lock = threading.Lock()
 
     def append(self, line: str) -> None:
-        """Append a log line (thread-safe)."""
+        """Append a log line (thread-safe). Fans out to any SSE subscriber queues."""
         with self._lock:
             self._buffer.append(line)
+        # Fan-out to all asyncio Queues (SSE clients).
+        # put_nowait is used so the calling thread is never blocked.
+        with self._queues_lock:
+            live = []
+            for q in self._queues:
+                try:
+                    q.put_nowait(line)
+                    live.append(q)
+                except asyncio.QueueFull:
+                    live.append(q)
+                except Exception:
+                    pass  # Dead queue — do not keep it
+            self._queues = live
 
     def tail(self, n: int = 200) -> list[str]:
         """Return the last n lines as a list (thread-safe)."""
@@ -39,10 +63,77 @@ class LogBuffer:
         with self._lock:
             self._buffer.clear()
 
+    def subscribe(self) -> asyncio.Queue:
+        """
+        Return a new asyncio.Queue that will receive all future appended lines.
+        Call unsubscribe() when the SSE client disconnects to avoid leaking queues.
+        """
+        q: asyncio.Queue = asyncio.Queue(maxsize=200)
+        with self._queues_lock:
+            self._queues.append(q)
+        return q
+
+    def unsubscribe(self, q: asyncio.Queue) -> None:
+        """Remove a subscriber queue."""
+        with self._queues_lock:
+            try:
+                self._queues.remove(q)
+            except ValueError:
+                pass
+
     def __len__(self) -> int:
         with self._lock:
             return len(self._buffer)
 
 
-# Global singleton used by renamer.py and the SSE endpoint
+class LogHandler(logging.Handler):
+    """
+    Python logging.Handler that writes records into a LogBuffer.
+
+    Install with:
+        logging.getLogger().addHandler(LogHandler(log_buffer))
+    """
+
+    def __init__(self, buffer: LogBuffer, level: int = logging.DEBUG) -> None:
+        super().__init__(level)
+        self._buffer = buffer
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            line = self.format(record)
+            self._buffer.append(line)
+        except Exception:
+            self.handleError(record)
+
+
+# ---------------------------------------------------------------------------
+# Global singleton + convenience wrappers used by tracker_api.py
+# ---------------------------------------------------------------------------
+
+# Global singleton used by renamer.py, scheduler.py, and the SSE endpoints
 log_buffer = LogBuffer()
+
+
+def get_recent_logs(n: int = 100) -> list[str]:
+    """Return the last n lines from the global log buffer."""
+    return log_buffer.tail(n)
+
+
+def clear_logs() -> None:
+    """Clear the global log buffer."""
+    log_buffer.clear()
+
+
+def get_log_queue() -> asyncio.Queue:
+    """
+    Return a new async queue subscribed to all future log lines.
+
+    The caller MUST call unsubscribe_log_queue(q) when done to avoid leaks.
+    """
+    return log_buffer.subscribe()
+
+
+def unsubscribe_log_queue(q: asyncio.Queue) -> None:
+    """Unsubscribe a previously subscribed queue."""
+    log_buffer.unsubscribe(q)
+

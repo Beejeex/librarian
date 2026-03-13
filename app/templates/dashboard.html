@@ -91,4 +91,49 @@
   </div>
 
 </div>
+
+{# ── Tracker summary card ── #}
+{% set tracker_total = (tracker_counts.queued or 0) + (tracker_counts.pending or 0) + (tracker_counts.copying or 0) + (tracker_counts.copied or 0) + (tracker_counts.finished or 0) + (tracker_counts.error or 0) %}
+<div class="card" style="border-left:4px solid #3b82f6;">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.75rem;">
+    <div>
+      <h2 style="margin:0 0 .25rem;">🗂 Tracker</h2>
+      <p style="margin:0;font-size:.875rem;color:#64748b;">
+        {% if tracker_total == 0 %}
+          No items tracked yet. <a href="/settings#tracker">Configure tags</a> to start tracking.
+        {% else %}
+          {{ tracker_total }} item(s) total
+          {% if tracker_counts.copying or tracker_counts.pending %}
+            · <span style="color:#a855f7;">{{ (tracker_counts.copying or 0) + (tracker_counts.pending or 0) }} in progress</span>
+          {% endif %}
+          {% if tracker_counts.queued %}
+            · <span style="color:#f59e0b;">{{ tracker_counts.queued }} awaiting approval</span>
+          {% endif %}
+          {% if tracker_counts.error %}
+            · <span style="color:#ef4444;">{{ tracker_counts.error }} error(s)</span>
+          {% endif %}
+        {% endif %}
+      </p>
+    </div>
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;">
+      {% if tracker_counts.queued %}
+      <a href="/tracker/items?filter=queued" class="btn btn-primary" style="font-size:.85rem;">
+        Approve ({{ tracker_counts.queued }})
+      </a>
+      {% endif %}
+      <a href="/tracker" class="btn btn-ghost" style="font-size:.85rem;">Tracker Dashboard →</a>
+    </div>
+  </div>
+  {% if tracker_total > 0 %}
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.75rem;">
+    {% if tracker_counts.queued %}<span class="badge badge-queued">{{ tracker_counts.queued }} queued</span>{% endif %}
+    {% if tracker_counts.pending %}<span style="background:#e2e8f0;color:#475569;padding:2px 8px;border-radius:999px;font-size:.75rem;font-weight:600;">{{ tracker_counts.pending }} pending</span>{% endif %}
+    {% if tracker_counts.copying %}<span class="badge badge-copying">{{ tracker_counts.copying }} copying</span>{% endif %}
+    {% if tracker_counts.copied %}<span class="badge badge-copied">{{ tracker_counts.copied }} copied</span>{% endif %}
+    {% if tracker_counts.finished %}<span class="badge badge-finished">{{ tracker_counts.finished }} finished</span>{% endif %}
+    {% if tracker_counts.error %}<span class="badge badge-error">{{ tracker_counts.error }} error</span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
 {% endblock %}

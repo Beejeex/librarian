@@ -1,0 +1,29 @@
+{% if poll_running or copy_jobs %}
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:.5rem;padding:1rem 1.25rem;margin-top:1rem;">
+  <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:{% if copy_jobs %}.75rem{% else '0' %};">
+    <span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:50%;animation:pulse 1.5s ease-in-out infinite;"></span>
+    <span style="font-weight:600;color:#1e40af;">Poll running…</span>
+    {% if copy_jobs %}
+    <span style="color:#3b82f6;font-size:.85rem;">{{ copy_jobs | length }} file(s) copying</span>
+    {% endif %}
+  </div>
+  {% for job in copy_jobs %}
+  <div style="margin-bottom:.5rem;">
+    <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:2px;">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%;color:#1e293b;" title="{{ job.title }}">{{ job.title }}</span>
+      <span style="color:#64748b;flex-shrink:0;margin-left:.5rem;">{{ job.pct }}% · {{ job.speed_str }}</span>
+    </div>
+    <div style="background:#dbeafe;border-radius:4px;height:6px;overflow:hidden;">
+      <div style="background:#3b82f6;height:100%;width:{{ job.pct }}%;transition:width .4s ease;"></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<style>
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(1.25); }
+}
+</style>
+{% endif %}
