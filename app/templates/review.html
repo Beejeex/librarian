@@ -66,8 +66,9 @@
 }">
   <div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;">
     <span style="font-size:.875rem;color:#64748b;">
-      <strong>{{ items | length }}</strong> item(s) &nbsp;·&nbsp;
+      <strong>{{ items | length }}</strong> in batch &nbsp;·&nbsp;
       <strong>{{ items | selectattr('status','eq','approved') | list | length }}</strong> approved
+      {% if scan_run.total_items > items | length %}&nbsp;·&nbsp;<strong>{{ scan_run.total_items }}</strong> mismatches found{% endif %}
     </span>
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
       <label style="font-size:.875rem;font-weight:600;margin:0;">Batch:</label>
@@ -86,7 +87,7 @@
   <div class="card" style="padding:0;overflow:hidden;">
     {% if items | length >= batch_size %}
     <div style="background:#fef9c3;color:#92400e;padding:.6rem 1.25rem;font-size:.85rem;border-bottom:1px solid #fde68a;">
-      ⚠ Showing first {{ batch_size }} items. Approve All → Apply, then re-scan to process the next batch.
+      Approve → Apply → Re-scan
     </div>
     {% endif %}
     <table>
