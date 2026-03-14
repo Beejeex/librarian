@@ -8,7 +8,7 @@
 {% macro source_panel(label, icon, src_key, scan_run, items, batch_size) %}
 {% if not scan_run %}
 <div class="card">
-  <p style="color:#64748b;">No scan results for <strong>{{ label }}</strong>. <a href="/">Run a scan first.</a></p>
+  <p style="color:#64748b;">No scan has been run for <strong>{{ label }}</strong> yet. <a href="/">Go to the dashboard to scan.</a></p>
 </div>
 {% elif scan_run.status == "scanning" %}
 <div class="card" x-data="{}" x-init="setTimeout(() => location.reload(), 2000)">
@@ -16,7 +16,13 @@
 </div>
 {% elif items | length == 0 %}
 <div class="card">
+  {% if scan_run.status == "done" %}
+  <div class="alert alert-success">{{ icon }} Last scan for {{ label }} is fully applied ({{ scan_run.done_count }} renamed, {{ scan_run.error_count }} errors). <a href="/">Run a new scan</a> to check for fresh mismatches.</div>
+  {% elif scan_run.status == "error" %}
+  <div class="alert" style="background:#fee2e2;color:#b91c1c;">{{ icon }} Scan for {{ label }} encountered an error. <a href="/">Try scanning again.</a></div>
+  {% else %}
   <div class="alert alert-success">{{ icon }} {{ label }} — no folder mismatches found.</div>
+  {% endif %}
 </div>
 {% else %}
 <div x-data="{
