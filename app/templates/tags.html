@@ -198,17 +198,20 @@
               <td style="padding:.5rem 1rem;">
                 <div style="display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;">
 
-                  {# Tag badge with × remove button #}
+                  {# Tag badge: click label to filter, × to remove #}
                   <template x-for="tag_id in item.tag_ids" :key="tag_id">
-                    <span style="display:inline-flex;align-items:center;gap:.25rem;
-                                 background:#dbeafe;color:#1e40af;
-                                 padding:.15rem .55rem .15rem .55rem;
-                                 border-radius:999px;font-size:.78rem;font-weight:500;">
-                      <span x-text="getTagLabel(tag_id)"></span>
+                    <span :style="filterTag[source] === getTagLabel(tag_id)
+                                    ? 'display:inline-flex;align-items:center;gap:.25rem;background:#1d4ed8;color:#fff;padding:.15rem .55rem .15rem .55rem;border-radius:999px;font-size:.78rem;font-weight:500;'
+                                    : 'display:inline-flex;align-items:center;gap:.25rem;background:#dbeafe;color:#1e40af;padding:.15rem .55rem .15rem .55rem;border-radius:999px;font-size:.78rem;font-weight:500;'">
+                      <span @click.stop="setTagFilter(getTagLabel(tag_id))"
+                            style="cursor:pointer;"
+                            :title="filterTag[source] === getTagLabel(tag_id) ? 'Clear filter' : 'Filter by tag'"
+                            x-text="getTagLabel(tag_id)"></span>
                       <button type="button"
                               @click.stop="removeTagFromItem(item, getTagLabel(tag_id))"
-                              style="background:none;border:none;cursor:pointer;padding:0;line-height:1;
-                                     color:#93c5fd;font-size:.9rem;display:flex;align-items:center;"
+                              :style="filterTag[source] === getTagLabel(tag_id)
+                                        ? 'background:none;border:none;cursor:pointer;padding:0;line-height:1;color:rgba(255,255,255,.7);font-size:.9rem;display:flex;align-items:center;'
+                                        : 'background:none;border:none;cursor:pointer;padding:0;line-height:1;color:#93c5fd;font-size:.9rem;display:flex;align-items:center;'"
                               title="Remove tag">×</button>
                     </span>
                   </template>
@@ -407,6 +410,12 @@ function tagsApp() {
     toggleSort(col) {
       if (this.sortCol === col) this.sortAsc = !this.sortAsc;
       else { this.sortCol = col; this.sortAsc = true; }
+      this.resetPage();
+    },
+
+    setTagFilter(label) {
+      // Toggle: clicking the active filter clears it
+      this.filterTag[this.source] = this.filterTag[this.source] === label ? '' : label;
       this.resetPage();
     },
 
