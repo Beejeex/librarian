@@ -63,6 +63,7 @@ async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
 
     # --- Compare and record mismatches ---
     mismatch_count = 0
+    total_found = 0
     batch_size = config.batch_size
     root_folder = (
         config.radarr_root_folder if source == "radarr" else config.sonarr_root_folder
@@ -72,28 +73,29 @@ async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
     )
 
     for item in items:
-        if mismatch_count >= batch_size:
-            break
         rename_item = _build_rename_item(item, source, scan_run.id, root_folder, folder_format)
         if rename_item is None:
             continue  # already correct or invalid — skip
-        session.add(rename_item)
-        mismatch_count += 1
+        total_found += 1
+        if mismatch_count < batch_size:
+            session.add(rename_item)
+            mismatch_count += 1
 
     session.commit()
 
     # --- Finalise ScanRun ---
-    scan_run.total_items = mismatch_count
+    scan_run.total_items = total_found
     scan_run.status = "ready"
     session.add(scan_run)
     session.commit()
     session.refresh(scan_run)
 
     logger.info(
-        "ScanRun %s complete: %s mismatches found for %s",
+        "ScanRun %s complete: %s mismatches found for %s (batch: %s)",
         scan_run.id,
-        mismatch_count,
+        total_found,
         source,
+        mismatch_count,
     )
     return scan_run
 

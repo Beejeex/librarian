@@ -68,7 +68,7 @@
     <span style="font-size:.875rem;color:#64748b;">
       <strong>{{ items | length }}</strong> in batch &nbsp;·&nbsp;
       <strong>{{ items | selectattr('status','eq','approved') | list | length }}</strong> approved
-      {% if scan_run.total_items > items | length %}&nbsp;·&nbsp;<strong>{{ scan_run.total_items }}</strong> mismatches found{% endif %}
+      {% if scan_run.total_items > batch_size %}&nbsp;·&nbsp;<strong>{{ scan_run.total_items }}</strong> mismatches found{% endif %}
     </span>
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
       <label style="font-size:.875rem;font-weight:600;margin:0;">Batch:</label>
