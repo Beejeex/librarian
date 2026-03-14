@@ -57,10 +57,6 @@
   },
   async startApply() {
     this.applying = true;
-    await fetch('/api/apply', {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({scan_run_id: this.scanRunId, batch_size: this.batchSize})
-    });
     window.location = '/apply?scan_run_id=' + this.scanRunId + '&batch_size=' + this.batchSize;
   }
 }">
