@@ -76,3 +76,16 @@ class BaseArrClient:
             logger.error("PUT %s returned %s", url, response.status_code)
             response.raise_for_status()
         return response.json()
+
+    async def post(self, path: str, body: dict) -> dict:
+        """
+        Perform an authenticated POST request with a JSON body.
+        Returns parsed JSON. Raises httpx.HTTPStatusError on non-2xx.
+        """
+        url = f"{self._base_url}{path}"
+        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS) as client:
+            response = await client.post(url, headers=self._headers, json=body)
+        if not response.is_success:
+            logger.error("POST %s returned %s", url, response.status_code)
+            response.raise_for_status()
+        return response.json()

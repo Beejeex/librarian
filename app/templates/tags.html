@@ -1,0 +1,546 @@
+{% extends "base.html" %}
+{% block title %}Librarian — Tags{% endblock %}
+
+{% block content %}
+<h1>Tag Management</h1>
+
+<div x-data="tagsApp()" x-init="init()">
+
+  {# ── Tab nav ── #}
+  <div class="tab-nav">
+    <button type="button" class="tab-btn" :class="source === 'radarr' ? 'tab-active' : ''" @click="switchTab('radarr')">🎬 Movies</button>
+    <button type="button" class="tab-btn" :class="source === 'sonarr' ? 'tab-active' : ''" @click="switchTab('sonarr')">📺 TV Shows</button>
+  </div>
+
+  {# ── Loading ── #}
+  <div x-show="loading[source]" style="padding:3rem;text-align:center;color:#64748b;">
+    Loading…
+  </div>
+
+  {# ── Error ── #}
+  <div x-show="!loading[source] && !!error[source]"
+       style="background:#fef2f2;color:#b91c1c;padding:1rem 1.25rem;border-radius:8px;margin-bottom:1rem;display:flex;align-items:center;gap:1rem;">
+    <span x-text="error[source]"></span>
+    <button type="button" class="btn btn-secondary" @click="reload()">Retry</button>
+  </div>
+
+  {# ── Main content ── #}
+  <div x-show="loaded[source] && !loading[source]">
+
+    {# ── Toolbar + Create tag ── #}
+    <div class="card" style="margin-bottom:1rem;">
+
+      {# Search / filter row #}
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.85rem;">
+        <input type="search" placeholder="Search title…"
+               x-model="search[source]"
+               @input.debounce.300ms="resetPage()"
+               style="max-width:260px;">
+
+        <select x-model="filterTag[source]" @change="resetPage()" style="max-width:220px;">
+          <option value="">All items</option>
+          <option value="__none__">No tags</option>
+          <template x-for="tag in currentTags.slice().sort((a,b) => a.label.localeCompare(b.label))" :key="tag.label">
+            <option :value="tag.label" x-text="tag.label"></option>
+          </template>
+        </select>
+
+        <button type="button" class="btn btn-secondary" @click="reload()" :disabled="loading[source]">
+          ↺ Refresh
+        </button>
+
+        <span style="margin-left:auto;color:#64748b;font-size:.85rem;">
+          <span x-text="filteredItems.length"></span> of <span x-text="currentData.items.length"></span> items
+          <template x-if="selectedCount > 0">
+            <span> &middot; <strong x-text="selectedCount"></strong> selected
+              <button type="button" @click="selectAllFiltered()"
+                      style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:.85rem;text-decoration:underline;padding:0 .25rem;"
+                      x-show="selectedCount < filteredItems.length">
+                (select all <span x-text="filteredItems.length"></span>)
+              </button>
+              <button type="button" @click="clearSelection()"
+                      style="background:none;border:none;color:#64748b;cursor:pointer;font-size:.85rem;text-decoration:underline;padding:0 .25rem;">
+                clear
+              </button>
+            </span>
+          </template>
+        </span>
+      </div>
+
+      {# Create tag row #}
+      <div style="display:flex;gap:.5rem;align-items:center;">
+        <input type="text" placeholder="New tag name…"
+               x-model="newTagLabel"
+               @keydown.enter.prevent="createTag()"
+               style="max-width:220px;">
+        <button type="button" class="btn btn-secondary"
+                @click="createTag()"
+                :disabled="!newTagLabel.trim() || creating">
+          <span x-show="!creating">+ Create Tag</span>
+          <span x-show="creating">Creating…</span>
+        </button>
+        <span x-show="newTagCreated" style="color:#16a34a;font-size:.85rem;">✓ Tag created</span>
+      </div>
+    </div>
+
+    {# ── Bulk action bar ── #}
+    <div x-show="selectedCount > 0"
+         class="card"
+         style="border-left:4px solid #3b82f6;margin-bottom:1rem;">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <span style="font-weight:600;color:#1e40af;min-width:6rem;">
+          <span x-text="selectedCount"></span> selected
+        </span>
+
+        <select x-model="bulkAction" style="width:140px;">
+          <option value="add">Add tag</option>
+          <option value="remove">Remove tag</option>
+          <option value="replace">Replace tag</option>
+        </select>
+
+        {# Add #}
+        <template x-if="bulkAction === 'add'">
+          <select x-model="bulkAddTag" style="width:160px;">
+            <option value="">— pick tag —</option>
+            <template x-for="tag in currentTags.slice().sort((a,b) => a.label.localeCompare(b.label))" :key="tag.id">
+              <option :value="tag.label" x-text="tag.label"></option>
+            </template>
+          </select>
+        </template>
+
+        {# Remove #}
+        <template x-if="bulkAction === 'remove'">
+          <select x-model="bulkRemoveTag" style="width:160px;">
+            <option value="">— pick tag —</option>
+            <template x-for="tag in currentTags.slice().sort((a,b) => a.label.localeCompare(b.label))" :key="tag.id">
+              <option :value="tag.label" x-text="tag.label"></option>
+            </template>
+          </select>
+        </template>
+
+        {# Replace #}
+        <template x-if="bulkAction === 'replace'">
+          <div style="display:flex;gap:.5rem;align-items:center;">
+            <select x-model="bulkReplaceFrom" style="width:145px;">
+              <option value="">— from tag —</option>
+              <template x-for="tag in currentTags.slice().sort((a,b) => a.label.localeCompare(b.label))" :key="tag.id">
+                <option :value="tag.label" x-text="tag.label"></option>
+              </template>
+            </select>
+            <span style="color:#94a3b8;">→</span>
+            <select x-model="bulkReplaceTo" style="width:145px;">
+              <option value="">— to tag —</option>
+              <template x-for="tag in currentTags.slice().sort((a,b) => a.label.localeCompare(b.label))" :key="tag.id">
+                <option :value="tag.label" x-text="tag.label"></option>
+              </template>
+            </select>
+          </div>
+        </template>
+
+        <button type="button" class="btn btn-primary" @click="applyBulk()" :disabled="bulkWorking">
+          <span x-show="!bulkWorking">Apply</span>
+          <span x-show="bulkWorking">Working…</span>
+        </button>
+        <button type="button" class="btn btn-secondary" @click="clearSelection()">Clear</button>
+      </div>
+
+      <div x-show="bulkResult" style="margin-top:.6rem;font-size:.85rem;">
+        <span style="color:#16a34a;">✓ <span x-text="bulkResult?.updated"></span> updated</span>
+        <span x-show="bulkResult?.errors?.length > 0" style="color:#dc2626;margin-left:.75rem;">
+          &middot; <span x-text="bulkResult?.errors?.length"></span> failed
+        </span>
+      </div>
+    </div>
+
+    {# ── Table ── #}
+    <div class="card" style="padding:0;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">
+            <th style="width:42px;padding:.75rem;text-align:center;">
+              <input type="checkbox"
+                     :checked="allPageSelected"
+                     @change="togglePageSelect()"
+                     title="Select / deselect page">
+            </th>
+            <th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:#374151;cursor:pointer;user-select:none;"
+                @click="toggleSort('title')">
+              Title
+              <span x-text="sortCol === 'title' ? (sortAsc ? ' ▲' : ' ▼') : ''" style="color:#94a3b8;font-size:.75rem;"></span>
+            </th>
+            <th style="padding:.75rem .5rem;text-align:left;font-weight:600;color:#374151;width:72px;cursor:pointer;user-select:none;"
+                @click="toggleSort('year')">
+              Year
+              <span x-text="sortCol === 'year' ? (sortAsc ? ' ▲' : ' ▼') : ''" style="color:#94a3b8;font-size:.75rem;"></span>
+            </th>
+            <th style="padding:.75rem 1rem;text-align:left;font-weight:600;color:#374151;">Tags</th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="item in pagedItems" :key="item.id">
+            <tr style="border-bottom:1px solid #f1f5f9;"
+                :style="isSelected(item.id) ? 'background:#eff6ff;' : ''">
+
+              {# Checkbox #}
+              <td style="text-align:center;padding:.5rem .75rem;">
+                <input type="checkbox" :checked="isSelected(item.id)" @change="toggleSelect(item.id)">
+              </td>
+
+              {# Title #}
+              <td style="padding:.5rem 1rem;cursor:pointer;font-size:.9rem;font-weight:500;"
+                  @click="toggleSelect(item.id)"
+                  x-text="item.title"></td>
+
+              {# Year #}
+              <td style="padding:.5rem .5rem;color:#64748b;font-size:.85rem;" x-text="item.year || '—'"></td>
+
+              {# Tags #}
+              <td style="padding:.5rem 1rem;">
+                <div style="display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;">
+
+                  {# Tag badge with × remove button #}
+                  <template x-for="tag_id in item.tag_ids" :key="tag_id">
+                    <span style="display:inline-flex;align-items:center;gap:.25rem;
+                                 background:#dbeafe;color:#1e40af;
+                                 padding:.15rem .55rem .15rem .55rem;
+                                 border-radius:999px;font-size:.78rem;font-weight:500;">
+                      <span x-text="getTagLabel(tag_id)"></span>
+                      <button type="button"
+                              @click.stop="removeTagFromItem(item, getTagLabel(tag_id))"
+                              style="background:none;border:none;cursor:pointer;padding:0;line-height:1;
+                                     color:#93c5fd;font-size:.9rem;display:flex;align-items:center;"
+                              title="Remove tag">×</button>
+                    </span>
+                  </template>
+
+                  {# + Add tag inline dropdown #}
+                  <div x-data="{open: false}" style="position:relative;display:inline-block;">
+                    <button type="button"
+                            @click.stop="open = !open"
+                            style="background:none;border:1px dashed #94a3b8;border-radius:999px;
+                                   padding:.1rem .45rem;font-size:.78rem;cursor:pointer;color:#64748b;
+                                   line-height:1.4;"
+                            title="Add tag">+</button>
+
+                    <div x-show="open"
+                         @click.outside="open = false"
+                         style="position:absolute;left:0;top:calc(100% + 4px);z-index:100;
+                                background:#fff;border:1px solid #e2e8f0;border-radius:8px;
+                                box-shadow:0 4px 16px rgba(0,0,0,.1);
+                                min-width:150px;max-height:220px;overflow-y:auto;">
+                      <template x-for="tag in availableTagsForItem(item).sort((a,b) => a.label.localeCompare(b.label))" :key="tag.id">
+                        <div @click.stop="addTagToItem(item, tag.label); open = false"
+                             style="padding:.4rem .75rem;cursor:pointer;font-size:.85rem;"
+                             @mouseover="$el.style.background='#f1f5f9'"
+                             @mouseout="$el.style.background=''"
+                             x-text="tag.label"></div>
+                      </template>
+                      <div x-show="availableTagsForItem(item).length === 0"
+                           style="padding:.4rem .75rem;color:#94a3b8;font-size:.8rem;">
+                        No more tags
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </td>
+            </tr>
+          </template>
+
+          <tr x-show="pagedItems.length === 0 && !loading[source]">
+            <td colspan="4" style="text-align:center;padding:2.5rem;color:#94a3b8;">
+              No items match your filters.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# ── Pagination ── #}
+    <div x-show="totalPages > 1"
+         style="display:flex;align-items:center;gap:1rem;margin-top:1rem;flex-wrap:wrap;">
+      <button type="button" class="btn btn-secondary"
+              @click="prevPage()" :disabled="page[source] <= 1">← Prev</button>
+      <span style="color:#64748b;font-size:.85rem;">
+        Page <span x-text="page[source]"></span> of <span x-text="totalPages"></span>
+      </span>
+      <button type="button" class="btn btn-secondary"
+              @click="nextPage()" :disabled="page[source] >= totalPages">Next →</button>
+      <span style="margin-left:auto;color:#94a3b8;font-size:.8rem;">
+        Rows <span x-text="(page[source] - 1) * pageSize + 1"></span>–<span
+          x-text="Math.min(page[source] * pageSize, filteredItems.length)"></span>
+        of <span x-text="filteredItems.length"></span>
+      </span>
+    </div>
+
+  </div>{# end main content #}
+</div>{# end x-data #}
+
+<script>
+function tagsApp() {
+  return {
+    source: 'radarr',
+
+    // Per-source state
+    loaded:    { radarr: false, sonarr: false },
+    loading:   { radarr: false, sonarr: false },
+    error:     { radarr: '',    sonarr: ''    },
+    data:      { radarr: { tags: [], items: [] }, sonarr: { tags: [], items: [] } },
+    search:    { radarr: '',    sonarr: ''    },
+    filterTag: { radarr: '',    sonarr: ''    },
+    page:      { radarr: 1,     sonarr: 1     },
+    selected:  { radarr: [],    sonarr: []    },
+
+    // Sort
+    sortCol: 'title',
+    sortAsc: true,
+
+    // Pagination
+    pageSize: 50,
+
+    // Bulk
+    bulkAction: 'add',
+    bulkAddTag: '',
+    bulkRemoveTag: '',
+    bulkReplaceFrom: '',
+    bulkReplaceTo: '',
+    bulkWorking: false,
+    bulkResult: null,
+
+    // Create tag
+    newTagLabel: '',
+    creating: false,
+    newTagCreated: false,
+
+    // ── Computed helpers ───────────────────────────────────────
+
+    get currentData() { return this.data[this.source]; },
+    get currentTags() { return this.data[this.source].tags; },
+    get selectedCount() { return this.selected[this.source].length; },
+
+    getTagLabel(tagId) {
+      const t = this.currentTags.find(t => t.id === tagId);
+      return t ? t.label : String(tagId);
+    },
+
+    availableTagsForItem(item) {
+      return this.currentTags.filter(t => !item.tag_ids.includes(t.id));
+    },
+
+    isSelected(id) { return this.selected[this.source].includes(id); },
+
+    toggleSelect(id) {
+      const arr = this.selected[this.source];
+      const idx = arr.indexOf(id);
+      if (idx >= 0) arr.splice(idx, 1);
+      else          arr.push(id);
+    },
+
+    clearSelection() { this.selected[this.source] = []; },
+
+    selectAllFiltered() {
+      this.selected[this.source] = this.filteredItems.map(i => i.id);
+    },
+
+    get allPageSelected() {
+      return this.pagedItems.length > 0 && this.pagedItems.every(i => this.isSelected(i.id));
+    },
+
+    get somePageSelected() {
+      return this.pagedItems.some(i => this.isSelected(i.id));
+    },
+
+    togglePageSelect() {
+      if (this.allPageSelected) {
+        const ids = new Set(this.pagedItems.map(i => i.id));
+        this.selected[this.source] = this.selected[this.source].filter(id => !ids.has(id));
+      } else {
+        const existing = new Set(this.selected[this.source]);
+        this.pagedItems.forEach(i => existing.add(i.id));
+        this.selected[this.source] = Array.from(existing);
+      }
+    },
+
+    // ── Filtering / sorting / pagination ──────────────────────
+
+    get filteredItems() {
+      const items = this.data[this.source].items;
+      const s     = this.search[this.source].toLowerCase();
+      const ft    = this.filterTag[this.source];
+
+      let result = items.filter(item => {
+        if (s && !item.title.toLowerCase().includes(s)) return false;
+        if (ft === '__none__') return item.tag_ids.length === 0;
+        if (ft) {
+          const tag = this.currentTags.find(t => t.label === ft);
+          return tag ? item.tag_ids.includes(tag.id) : false;
+        }
+        return true;
+      });
+
+      result = result.slice().sort((a, b) => {
+        let va = a[this.sortCol] ?? '';
+        let vb = b[this.sortCol] ?? '';
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return this.sortAsc ? -1 : 1;
+        if (va > vb) return this.sortAsc ?  1 : -1;
+        return 0;
+      });
+
+      return result;
+    },
+
+    get totalPages() {
+      return Math.max(1, Math.ceil(this.filteredItems.length / this.pageSize));
+    },
+
+    get pagedItems() {
+      const start = (this.page[this.source] - 1) * this.pageSize;
+      return this.filteredItems.slice(start, start + this.pageSize);
+    },
+
+    resetPage()  { this.page[this.source] = 1; },
+    prevPage()   { if (this.page[this.source] > 1)             this.page[this.source]--; },
+    nextPage()   { if (this.page[this.source] < this.totalPages) this.page[this.source]++; },
+
+    toggleSort(col) {
+      if (this.sortCol === col) this.sortAsc = !this.sortAsc;
+      else { this.sortCol = col; this.sortAsc = true; }
+      this.resetPage();
+    },
+
+    // ── Data loading ──────────────────────────────────────────
+
+    async loadSource(src) {
+      if (this.loaded[src] || this.loading[src]) return;
+      this.loading[src] = true;
+      this.error[src]   = '';
+      try {
+        const r = await fetch(`/api/tags/${src}/data`);
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.detail || `HTTP ${r.status}`);
+        }
+        this.data[src]   = await r.json();
+        this.loaded[src] = true;
+      } catch (e) {
+        this.error[src] = e.message;
+      } finally {
+        this.loading[src] = false;
+      }
+    },
+
+    async reload() {
+      this.loaded[this.source] = false;
+      await this.loadSource(this.source);
+    },
+
+    switchTab(src) {
+      this.source     = src;
+      this.bulkResult = null;
+      this.loadSource(src);
+    },
+
+    init() { this.loadSource('radarr'); },
+
+    // ── Tag operations ────────────────────────────────────────
+
+    async createTag() {
+      const label = this.newTagLabel.trim();
+      if (!label) return;
+      this.creating      = true;
+      this.newTagCreated = false;
+      try {
+        const r = await fetch(`/api/tags/${this.source}/tag`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ label }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const newTag = await r.json();
+        this.data[this.source].tags.push(newTag);
+        this.newTagLabel   = '';
+        this.newTagCreated = true;
+        setTimeout(() => { this.newTagCreated = false; }, 3000);
+      } catch (e) {
+        alert('Failed to create tag: ' + e.message);
+      } finally {
+        this.creating = false;
+      }
+    },
+
+    async removeTagFromItem(item, tagLabel) {
+      const tag = this.currentTags.find(t => t.label === tagLabel);
+      if (!tag) return;
+      try {
+        const r = await fetch(`/api/tags/${this.source}/items/update`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ item_ids: [item.id], remove_labels: [tagLabel] }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        // Optimistic update
+        item.tag_ids = item.tag_ids.filter(id => id !== tag.id);
+      } catch (e) {
+        alert('Failed to remove tag: ' + e.message);
+      }
+    },
+
+    async addTagToItem(item, tagLabel) {
+      try {
+        const r = await fetch(`/api/tags/${this.source}/items/update`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ item_ids: [item.id], add_labels: [tagLabel] }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        // Optimistic update
+        const tag = this.currentTags.find(t => t.label === tagLabel);
+        if (tag && !item.tag_ids.includes(tag.id)) {
+          item.tag_ids = [...item.tag_ids, tag.id];
+        }
+      } catch (e) {
+        alert('Failed to add tag: ' + e.message);
+      }
+    },
+
+    async applyBulk() {
+      const ids = [...this.selected[this.source]];
+      if (!ids.length) return;
+
+      let add_labels = [], remove_labels = [];
+      if (this.bulkAction === 'add') {
+        if (!this.bulkAddTag) { alert('Select a tag to add.'); return; }
+        add_labels = [this.bulkAddTag];
+      } else if (this.bulkAction === 'remove') {
+        if (!this.bulkRemoveTag) { alert('Select a tag to remove.'); return; }
+        remove_labels = [this.bulkRemoveTag];
+      } else if (this.bulkAction === 'replace') {
+        if (!this.bulkReplaceFrom || !this.bulkReplaceTo) { alert('Select both tags for Replace.'); return; }
+        remove_labels = [this.bulkReplaceFrom];
+        add_labels    = [this.bulkReplaceTo];
+      }
+
+      this.bulkWorking = true;
+      this.bulkResult  = null;
+      try {
+        const r = await fetch(`/api/tags/${this.source}/items/update`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ item_ids: ids, add_labels, remove_labels }),
+        });
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        this.bulkResult = await r.json();
+        await this.reload();
+        this.clearSelection();
+      } catch (e) {
+        alert('Bulk update failed: ' + e.message);
+      } finally {
+        this.bulkWorking = false;
+      }
+    },
+  };
+}
+</script>
+{% endblock %}

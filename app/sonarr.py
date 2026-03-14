@@ -59,6 +59,36 @@ class SonarrClient(BaseArrClient):
         await self.put(f"/api/v3/series/{series_id}?moveFiles=false", series)
         logger.info("Sonarr series %s path updated to %s", series_id, new_path)
 
+    async def fetch_tags(self) -> list[dict]:
+        """Fetch all tags. Returns list of {id, label}."""
+        return await self.get("/api/v3/tag")
+
+    async def create_tag(self, label: str) -> dict:
+        """Create a new tag in Sonarr. Returns {id, label}."""
+        return await self.post("/api/v3/tag", {"label": label})
+
+    async def fetch_series_with_tags(self) -> list[dict]:
+        """Return all series as minimal dicts: id, title, year, tag_ids."""
+        series_list = await self.get("/api/v3/series")
+        return [
+            {
+                "id": s["id"],
+                "title": s["title"],
+                "year": s.get("year", 0),
+                "tag_ids": s.get("tags", []),
+            }
+            for s in series_list
+        ]
+
+    async def update_series_tags(
+        self, series_id: int, add_ids: set[int], remove_ids: set[int]
+    ) -> None:
+        """Add/remove tag IDs on a series using GET-then-PUT."""
+        series = await self.get(f"/api/v3/series/{series_id}")
+        current: set[int] = set(series.get("tags", []))
+        series["tags"] = sorted((current | add_ids) - remove_ids)
+        await self.put(f"/api/v3/series/{series_id}?moveFiles=false", series)
+
     async def get_tagged_episode_files(self, tag_name: str) -> list[SonarrEpisodeFile]:
         """
         Return all episode files for series that have tag_name applied.

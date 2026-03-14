@@ -203,6 +203,7 @@
     <a href="/" {% if request.url.path == "/" %}class="active"{% endif %}>Dashboard</a>
     <a href="/review" {% if request.url.path in ('/review', '/apply') or request.url.path.startswith('/review') %}class="active"{% endif %}>Renamer</a>
     <a href="/tracker" {% if request.url.path.startswith("/tracker") %}class="active"{% endif %}>Tracker</a>
+    <a href="/tags" {% if request.url.path.startswith("/tags") %}class="active"{% endif %}>Tags</a>
     <a href="/logs" {% if request.url.path == "/logs" %}class="active"{% endif %}>Logs</a>
     <a href="/settings" {% if request.url.path == "/settings" %}class="active"{% endif %}>Settings</a>
     <span style="margin-left:auto;color:#64748b;font-size:.78rem;font-weight:500;letter-spacing:.02em;">{{ VERSION }}</span>

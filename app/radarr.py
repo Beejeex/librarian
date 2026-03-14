@@ -57,6 +57,36 @@ class RadarrClient(BaseArrClient):
         await self.put(f"/api/v3/movie/{movie_id}?moveFiles=false", movie)
         logger.info("Radarr movie %s path updated to %s", movie_id, new_path)
 
+    async def fetch_tags(self) -> list[dict]:
+        """Fetch all tags. Returns list of {id, label}."""
+        return await self.get("/api/v3/tag")
+
+    async def create_tag(self, label: str) -> dict:
+        """Create a new tag in Radarr. Returns {id, label}."""
+        return await self.post("/api/v3/tag", {"label": label})
+
+    async def fetch_movies_with_tags(self) -> list[dict]:
+        """Return all movies as minimal dicts: id, title, year, tag_ids."""
+        movies = await self.get("/api/v3/movie")
+        return [
+            {
+                "id": m["id"],
+                "title": m["title"],
+                "year": m.get("year", 0),
+                "tag_ids": m.get("tags", []),
+            }
+            for m in movies
+        ]
+
+    async def update_movie_tags(
+        self, movie_id: int, add_ids: set[int], remove_ids: set[int]
+    ) -> None:
+        """Add/remove tag IDs on a movie using GET-then-PUT."""
+        movie = await self.get(f"/api/v3/movie/{movie_id}")
+        current: set[int] = set(movie.get("tags", []))
+        movie["tags"] = sorted((current | add_ids) - remove_ids)
+        await self.put(f"/api/v3/movie/{movie_id}?moveFiles=false", movie)
+
     async def get_tagged_movies(self, tag_name: str) -> list[RadarrMovie]:
         """
         Return all movies in Radarr that have tag_name applied and have a file on disk.

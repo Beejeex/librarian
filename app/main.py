@@ -26,6 +26,7 @@ from app.log_buffer import LogHandler, log_buffer
 from app.models import TrackedItem
 from app.routers import api, ui
 from app.routers import tracker_api, tracker_ui
+from app.routers import tags_api, tags_ui
 from app.scheduler import start_scheduler, stop_scheduler
 from app.watcher import start_watcher, stop_watcher
 
@@ -110,6 +111,8 @@ app.include_router(ui.router)
 app.include_router(api.router)
 app.include_router(tracker_ui.router)
 app.include_router(tracker_api.router)
+app.include_router(tags_ui.router)
+app.include_router(tags_api.router)
 
 
 @app.get("/health")
