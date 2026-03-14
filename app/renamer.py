@@ -122,6 +122,7 @@ async def _process_item(
     Scenarios:
       rename    — old folder exists, new does not → rename on disk + update arr
       arr_only  — disk already has expected name → update arr path only
+      disk_only — arr already has expected name, disk still has old name → rename disk only
       collision — both old and new exist on disk → error, skip (unsafe to rename)
       missing   — neither folder exists on disk  → error, skip
       unknown   — scenario was not classified at scan time → re-check live
@@ -140,6 +141,37 @@ async def _process_item(
         return
 
     scenario = item.disk_scenario
+
+    # --- disk_only: arr already correct, disk still has old folder name ---
+    if scenario == "disk_only":
+        # current_path in arr namespace = arr's (already correct) path
+        # current_folder = the actual old folder name on disk
+        try:
+            arr_local = remap_to_container(item.expected_path, root_folder, media_mount)
+        except ValueError as exc:
+            _mark_error(item, f"Path remap failed: {exc}", session)
+            log_buffer.append(f"[{item.title}] ERROR: {exc}")
+            logger.error("Path remap failed for disk_only item %s: %s", item.id, exc)
+            return
+        parent_dir = os.path.dirname(arr_local)
+        old_local = os.path.join(parent_dir, item.current_folder)
+        new_local = os.path.join(parent_dir, item.expected_folder)
+        log_buffer.append(f"[{item.title}]  [disk_only]")
+        log_buffer.append(f"  {item.current_folder}")
+        log_buffer.append(f"  → {item.expected_folder}")
+        try:
+            await asyncio.to_thread(os.rename, old_local, new_local)
+            log_buffer.append(f"  ↳ disk rename OK (arr already correct)")
+            logger.info("disk_only rename: %s → %s", old_local, new_local)
+            item.status = "done"
+        except Exception as exc:
+            _mark_error(item, f"Disk rename failed: {exc}", session)
+            log_buffer.append(f"  ↳ disk rename FAILED: {exc}")
+            logger.error("disk_only rename failed for item %s: %s", item.id, exc)
+        item.updated_at = datetime.now(UTC)
+        session.add(item)
+        session.commit()
+        return
 
     # Re-classify at apply time for items scanned before this feature existed
     if scenario == "unknown":

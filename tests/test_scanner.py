@@ -124,8 +124,8 @@ class TestRunScanRadarr:
 
         assert scan_run.total_items == 0
 
-    async def test_all_mismatches_collected(self, db_session, sample_config):
-        """Scan finds all mismatches regardless of batch_size — batch_size only limits apply."""
+    async def test_batch_size_limits_items_collected(self, db_session, sample_config):
+        """Scan stores at most batch_size mismatches — apply processes them, then rescan gets the next batch."""
         # sample_config.batch_size == 10; create 12 distinct mismatching movies
         movies = [
             {
@@ -140,9 +140,9 @@ class TestRunScanRadarr:
         with patch("app.scanner.get_radarr_client", return_value=_make_radarr_client(movies)):
             scan_run = await run_scan("radarr", db_session, sample_config)
 
-        assert scan_run.total_items == 12  # all found, not capped at batch_size
+        assert scan_run.total_items == sample_config.batch_size  # capped at 10
         items = db_session.exec(select(RenameItem)).all()
-        assert len(items) == 12
+        assert len(items) == sample_config.batch_size
 
 
 class TestRunScanSonarr:
