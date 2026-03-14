@@ -17,11 +17,29 @@
 {% elif items | length == 0 %}
 <div class="card">
   {% if scan_run.status == "done" %}
-  <div class="alert alert-success">{{ icon }} Last scan for {{ label }} is fully applied ({{ scan_run.done_count }} renamed, {{ scan_run.error_count }} errors). <a href="/">Run a new scan</a> to check for fresh mismatches.</div>
+  <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <span>{{ icon }} Last scan for {{ label }} is fully applied ({{ scan_run.done_count }} renamed, {{ scan_run.error_count }} errors).</span>
+    <button class="btn btn-primary" x-data="{ loading: false }"
+      @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+      <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
+    </button>
+  </div>
   {% elif scan_run.status == "error" %}
-  <div class="alert" style="background:#fee2e2;color:#b91c1c;">{{ icon }} Scan for {{ label }} encountered an error. <a href="/">Try scanning again.</a></div>
+  <div class="alert" style="background:#fee2e2;color:#b91c1c;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <span>{{ icon }} Scan for {{ label }} encountered an error.</span>
+    <button class="btn btn-primary" x-data="{ loading: false }"
+      @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+      <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
+    </button>
+  </div>
   {% else %}
-  <div class="alert alert-success">{{ icon }} {{ label }} — no folder mismatches found.</div>
+  <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <span>{{ icon }} {{ label }} — no folder mismatches found.</span>
+    <button class="btn btn-primary" x-data="{ loading: false }"
+      @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+      <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
+    </button>
+  </div>
   {% endif %}
 </div>
 {% else %}
@@ -29,6 +47,7 @@
   batchSize: {{ batch_size }},
   scanRunId: {{ scan_run.id }},
   applying: false,
+  scanning: false,
   async approveAll() {
     await fetch('/api/items/approve-all', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -56,6 +75,10 @@
              style="width:72px;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;">
     </div>
     <button class="btn btn-ghost" @click="approveAll()">Approve All</button>
+    <button class="btn btn-ghost" :disabled="scanning"
+      @click="scanning=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+      <span x-show="!scanning">🔄 Re-scan</span><span x-show="scanning">Scanning…</span>
+    </button>
     <button class="btn btn-success" :disabled="applying" @click="startApply()">
       <span x-show="!applying">Apply</span><span x-show="applying">Starting…</span>
     </button>
