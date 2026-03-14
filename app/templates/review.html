@@ -81,7 +81,18 @@
         <tr id="row-{{ item.id }}-{{ src_key }}"
             x-data="{ status: '{{ item.status }}' }"
             :style="status === 'skipped' ? 'opacity:0.45' : ''">
-          <td style="font-family:monospace;font-size:.8rem;word-break:break-all;">{{ item.current_folder }}</td>
+          <td style="font-family:monospace;font-size:.8rem;word-break:break-all;">
+            {{ item.current_folder }}
+            <div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap;">
+              {% set sc = item.disk_scenario %}
+              {% if sc in ('rename', 'arr_only', 'collision', 'missing') %}
+              <span title="Arr database still references this folder name" style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:.7rem;font-weight:600;background:#dbeafe;color:#1e40af;font-family:sans-serif;">in arr</span>
+              {% endif %}
+              {% if sc in ('rename', 'disk_only', 'collision') %}
+              <span title="This folder exists on disk" style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:.7rem;font-weight:600;background:#dcfce7;color:#166534;font-family:sans-serif;">on disk</span>
+              {% endif %}
+            </div>
+          </td>
           <td style="font-family:monospace;font-size:.8rem;word-break:break-all;color:#0f172a;font-weight:500;">{{ item.expected_folder }}</td>
           <td>
             {% set sc = item.disk_scenario %}
