@@ -63,7 +63,11 @@ class TestRunScanRadarr:
         assert items[0].current_folder == "Dune.2021.2160p"
 
     async def test_matching_folder_excluded(self, db_session, sample_config):
-        """A movie that already matches the expected name is not written to DB."""
+        """A movie that already matches the expected name is not written to DB.
+
+        In tests MEDIA_MOUNTS has no real paths so disk check is skipped and the
+        item is excluded (scan_run.total_items == 0).
+        """
         movies = [
             {
                 "id": 2,
@@ -73,7 +77,9 @@ class TestRunScanRadarr:
                 "path": "/movies/Interstellar (2014) {tmdb-157336}",
             }
         ]
-        with patch("app.scanner.get_radarr_client", return_value=_make_radarr_client(movies)):
+        # Patch MEDIA_MOUNTS so the disk-existence check is skipped
+        with patch("app.scanner.get_radarr_client", return_value=_make_radarr_client(movies)), \
+             patch("app.scanner.MEDIA_MOUNTS", {}):
             scan_run = await run_scan("radarr", db_session, sample_config)
 
         assert scan_run.total_items == 0
@@ -118,8 +124,8 @@ class TestRunScanRadarr:
 
         assert scan_run.total_items == 0
 
-    async def test_batch_size_limits_items_collected(self, db_session, sample_config):
-        """Scan stores at most batch_size mismatches even when more exist in arr."""
+    async def test_all_mismatches_collected(self, db_session, sample_config):
+        """Scan finds all mismatches regardless of batch_size — batch_size only limits apply."""
         # sample_config.batch_size == 10; create 12 distinct mismatching movies
         movies = [
             {
@@ -134,9 +140,9 @@ class TestRunScanRadarr:
         with patch("app.scanner.get_radarr_client", return_value=_make_radarr_client(movies)):
             scan_run = await run_scan("radarr", db_session, sample_config)
 
-        assert scan_run.total_items == sample_config.batch_size  # capped at 10
+        assert scan_run.total_items == 12  # all found, not capped at batch_size
         items = db_session.exec(select(RenameItem)).all()
-        assert len(items) == sample_config.batch_size
+        assert len(items) == 12
 
 
 class TestRunScanSonarr:

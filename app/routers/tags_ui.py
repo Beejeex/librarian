@@ -12,6 +12,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from app.config import load_config
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -22,4 +24,14 @@ templates = Jinja2Templates(directory=_templates_dir)
 @router.get("/tags", response_class=HTMLResponse)
 async def tags_page(request: Request) -> HTMLResponse:
     """Render the tag management page."""
-    return templates.TemplateResponse("tags.html", {"request": request})
+    config = load_config()
+    radarr_configured = bool(config.radarr_url and config.radarr_api_key)
+    sonarr_configured = bool(config.sonarr_url and config.sonarr_api_key)
+    return templates.TemplateResponse(
+        "tags.html",
+        {
+            "request": request,
+            "radarr_configured": radarr_configured,
+            "sonarr_configured": sonarr_configured,
+        },
+    )

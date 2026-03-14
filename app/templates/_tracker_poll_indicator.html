@@ -1,6 +1,6 @@
 {% if poll_running or copy_jobs %}
 <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:.5rem;padding:1rem 1.25rem;margin-top:1rem;">
-  <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:{% if copy_jobs %}.75rem{% else '0' %};">
+  <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:{% if copy_jobs %}.75rem{% else %}0{% endif %};">
     <span style="display:inline-block;width:10px;height:10px;background:#3b82f6;border-radius:50%;animation:pulse 1.5s ease-in-out infinite;"></span>
     <span style="font-weight:600;color:#1e40af;">Poll running…</span>
     {% if copy_jobs %}

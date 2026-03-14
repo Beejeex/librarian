@@ -4,12 +4,20 @@
 {% block content %}
 <h1>Tag Management</h1>
 
-<div x-data="tagsApp()" x-init="init()">
+<div x-data="tagsApp({ radarrConfigured: {{ 'true' if radarr_configured else 'false' }}, sonarrConfigured: {{ 'true' if sonarr_configured else 'false' }} })" x-init="init()">
 
   {# ── Tab nav ── #}
   <div class="tab-nav">
-    <button type="button" class="tab-btn" :class="source === 'radarr' ? 'tab-active' : ''" @click="switchTab('radarr')">🎬 Movies</button>
-    <button type="button" class="tab-btn" :class="source === 'sonarr' ? 'tab-active' : ''" @click="switchTab('sonarr')">📺 TV Shows</button>
+    <button type="button" class="tab-btn"
+            :class="source === 'radarr' ? 'tab-active' : ''"
+            :disabled="!radarrConfigured"
+            :title="radarrConfigured ? '' : 'Radarr is not configured'"
+            @click="radarrConfigured && switchTab('radarr')">🎬 Movies</button>
+    <button type="button" class="tab-btn"
+            :class="source === 'sonarr' ? 'tab-active' : ''"
+            :disabled="!sonarrConfigured"
+            :title="sonarrConfigured ? '' : 'Sonarr is not configured'"
+            @click="sonarrConfigured && switchTab('sonarr')">📺 TV Shows</button>
   </div>
 
   {# ── Loading ── #}
@@ -280,9 +288,11 @@
 </div>{# end x-data #}
 
 <script>
-function tagsApp() {
+function tagsApp({ radarrConfigured = true, sonarrConfigured = true } = {}) {
   return {
-    source: 'radarr',
+    radarrConfigured,
+    sonarrConfigured,
+    source: radarrConfigured ? 'radarr' : (sonarrConfigured ? 'sonarr' : 'radarr'),
 
     // Per-source state
     loaded:    { radarr: false, sonarr: false },
@@ -422,6 +432,7 @@ function tagsApp() {
     // ── Data loading ──────────────────────────────────────────
 
     async loadSource(src) {
+      if ((src === 'radarr' && !this.radarrConfigured) || (src === 'sonarr' && !this.sonarrConfigured)) return;
       if (this.loaded[src] || this.loading[src]) return;
       this.loading[src] = true;
       this.error[src]   = '';
@@ -451,7 +462,7 @@ function tagsApp() {
       this.loadSource(src);
     },
 
-    init() { this.loadSource('radarr'); },
+    init() { this.loadSource(this.source); },
 
     // ── Tag operations ────────────────────────────────────────
 

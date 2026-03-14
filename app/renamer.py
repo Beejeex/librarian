@@ -173,9 +173,15 @@ async def _process_item(
         return
 
     if scenario == "missing":
-        msg = f"Folder '{item.current_folder}' not found on disk at {old_local}"
+        if item.current_folder == item.expected_folder:
+            msg = (
+                f"Arr path is already correct ('{item.expected_folder}') but the folder "
+                f"does not exist on disk at {old_local}. Check the mount and Radarr/Sonarr path settings."
+            )
+        else:
+            msg = f"Folder '{item.current_folder}' not found on disk at {old_local}"
         _mark_error(item, msg, session)
-        log_buffer.append(f"  ↳ MISSING — source folder not found, skipped")
+        log_buffer.append(f"  ↳ MISSING — folder not found on disk, skipped")
         logger.warning("Missing folder for item %s: %s", item.id, msg)
         return
 

@@ -119,17 +119,34 @@ async def review(
     radarr_run, radarr_items = _scan_data("radarr")
     sonarr_run, sonarr_items = _scan_data("sonarr")
 
+    radarr_configured = bool(config.radarr_url and config.radarr_api_key)
+    sonarr_configured = bool(config.sonarr_url and config.sonarr_api_key)
+
+    # Pre-select a valid tab: honour the query param, otherwise pick the first configured source
+    if source == "radarr" and radarr_configured:
+        active_source = "radarr"
+    elif source == "sonarr" and sonarr_configured:
+        active_source = "sonarr"
+    elif radarr_configured:
+        active_source = "radarr"
+    elif sonarr_configured:
+        active_source = "sonarr"
+    else:
+        active_source = "radarr"
+
     templates = get_templates()
     return templates.TemplateResponse(
         "review.html",
         {
             "request": request,
-            "active_source": source if source in ("radarr", "sonarr") else "radarr",
+            "active_source": active_source,
             "radarr_run": radarr_run,
             "radarr_items": radarr_items,
             "sonarr_run": sonarr_run,
             "sonarr_items": sonarr_items,
             "batch_size": config.batch_size,
+            "radarr_configured": radarr_configured,
+            "sonarr_configured": sonarr_configured,
         },
     )
 

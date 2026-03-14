@@ -55,6 +55,11 @@
     </button>
   </div>
   <div class="card" style="padding:0;overflow:hidden;">
+    {% if items | length > 200 %}
+    <div style="background:#fef9c3;color:#92400e;padding:.6rem 1.25rem;font-size:.85rem;border-bottom:1px solid #fde68a;">
+      ⚠ Showing first 200 of {{ items | length }} items. Use <strong>Approve All → Apply</strong> to process all at once.
+    </div>
+    {% endif %}
     <table>
       <thead>
         <tr>
@@ -66,7 +71,7 @@
         </tr>
       </thead>
       <tbody>
-        {% for item in items %}
+        {% for item in items[:200] %}
         <tr id="row-{{ item.id }}-{{ src_key }}"
             x-data="{ status: '{{ item.status }}' }"
             :style="status === 'skipped' ? 'opacity:0.45' : ''">
@@ -81,7 +86,11 @@
             {% elif sc == 'collision' %}
               <span title="Both folders exist — resolve manually" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#fee2e2;color:#dc2626;">⚠ collision</span>
             {% elif sc == 'missing' %}
+              {% if item.current_folder == item.expected_folder %}
+              <span title="Arr path is already correct but folder not found on disk — check mount" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#fef9c3;color:#92400e;">⚠ disk missing</span>
+              {% else %}
               <span title="Source folder not found on disk" style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;font-weight:600;background:#fef9c3;color:#92400e;">missing</span>
+              {% endif %}
             {% else %}
               <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:.75rem;color:#94a3b8;">—</span>
             {% endif %}
@@ -105,8 +114,14 @@
 {# ── Tab bar ── #}
 <div x-data="{ tab: '{{ active_source }}' }">
   <div class="tab-nav">
-    <button type="button" class="tab-btn" :class="tab==='radarr' ? 'tab-active' : ''" @click="tab='radarr'">🎬 Radarr</button>
-    <button type="button" class="tab-btn" :class="tab==='sonarr' ? 'tab-active' : ''" @click="tab='sonarr'">📺 Sonarr</button>
+    <button type="button" class="tab-btn"
+            :class="tab==='radarr' ? 'tab-active' : ''"
+            {% if not radarr_configured %}disabled title="Radarr is not configured"{% endif %}
+            @click="tab='radarr'">🎬 Radarr</button>
+    <button type="button" class="tab-btn"
+            :class="tab==='sonarr' ? 'tab-active' : ''"
+            {% if not sonarr_configured %}disabled title="Sonarr is not configured"{% endif %}
+            @click="tab='sonarr'">📺 Sonarr</button>
   </div>
 
   <div x-show="tab === 'radarr'">
