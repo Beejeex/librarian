@@ -397,8 +397,8 @@
 
 <script>
 function getTagSelected(selectId, textId) {
-  const sel = document.getElementById(selectId);
-  if (sel) return Array.from(sel.selectedOptions).map(o => o.value).join(',');
+  const hidden = document.getElementById(selectId);
+  if (hidden) return hidden.value || '';
   return document.getElementById(textId)?.value || '';
 }
 

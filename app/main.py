@@ -22,7 +22,7 @@ import logging
 
 from app.config import load_config
 from app.database import create_db_and_tables, engine, get_session
-from app.log_buffer import LogHandler, log_buffer
+from app.log_buffer import LogHandler, log_buffer, tracker_log_buffer
 from app.models import TrackedItem
 from app.routers import api, ui
 from app.routers import tracker_api, tracker_ui
@@ -63,10 +63,18 @@ async def lifespan(app: FastAPI):
     """
     create_db_and_tables()
 
-    # Install log handler so scheduler/watcher output flows into the SSE stream
-    handler = LogHandler(log_buffer, level=logging.INFO)
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)-8s %(name)s — %(message)s"))
-    logging.getLogger("app").addHandler(handler)
+    # Install log handlers so logger output flows into the correct SSE stream.
+    # Renamer-related loggers → log_buffer (Renamer Logs tab)
+    # Tracker-related loggers → tracker_log_buffer (Tracker Logs tab)
+    _fmt = logging.Formatter("%(asctime)s %(levelname)-8s %(name)s — %(message)s")
+    for _name in ("app.renamer", "app.scanner", "app.radarr", "app.sonarr", "app.arr_client"):
+        _h = LogHandler(log_buffer, level=logging.INFO)
+        _h.setFormatter(_fmt)
+        logging.getLogger(_name).addHandler(_h)
+    for _name in ("app.scheduler", "app.watcher", "app.copier", "app.notifier"):
+        _h = LogHandler(tracker_log_buffer, level=logging.INFO)
+        _h.setFormatter(_fmt)
+        logging.getLogger(_name).addHandler(_h)
 
     # Reset items stuck in 'copying' from a previous container restart
     with get_session() as session:

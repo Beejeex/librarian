@@ -1,14 +1,22 @@
 """
-log_buffer.py — In-memory bounded log line store.
+log_buffer.py — In-memory bounded log line stores.
 
-Provides a thread-safe deque of recent log lines written during an apply run
-or a tracker poll cycle.  The SSE endpoints read from this buffer to stream
-live output to the browser.
+Provides thread-safe deques of recent log lines.  The SSE endpoints read from
+these buffers to stream live output to the browser.
 
-A single global instance `log_buffer` services both the Renamer apply stream
-and the Tracker log stream.  A Python logging.Handler subclass (LogHandler)
-pushes log records from the standard library logging system into this buffer
-so scheduler/watcher output appears in the UI automatically.
+Two separate global instances are maintained so Renamer and Tracker output
+never cross-contaminate each other's UI streams:
+
+  log_buffer         — Renamer apply output (written by renamer.py directly
+                        and by the LogHandler on app.renamer / app.scanner /
+                        app.radarr / app.sonarr / app.arr_client loggers).
+
+  tracker_log_buffer — Tracker poll/copy/watcher output (written by the
+                        LogHandler on app.scheduler / app.watcher /
+                        app.copier / app.notifier loggers).
+
+A Python logging.Handler subclass (LogHandler) pushes log records from the
+standard library logging system into the appropriate buffer; see main.py.
 """
 
 import asyncio
@@ -107,26 +115,36 @@ class LogHandler(logging.Handler):
 
 
 # ---------------------------------------------------------------------------
-# Global singleton + convenience wrappers used by tracker_api.py
+# Global singletons — one per subsystem so Renamer and Tracker streams
+# are kept completely separate.
 # ---------------------------------------------------------------------------
 
-# Global singleton used by renamer.py, scheduler.py, and the SSE endpoints
+# Renamer apply output — written by renamer.py directly and by the
+# LogHandler installed on renamer-specific loggers in main.py.
 log_buffer = LogBuffer()
 
+# Tracker poll/copy/watcher output — written by the LogHandler installed
+# on tracker-specific loggers in main.py.
+tracker_log_buffer = LogBuffer()
+
+
+# ---------------------------------------------------------------------------
+# Renamer convenience wrappers (used by api.py)
+# ---------------------------------------------------------------------------
 
 def get_recent_logs(n: int = 100) -> list[str]:
-    """Return the last n lines from the global log buffer."""
+    """Return the last n lines from the renamer log buffer."""
     return log_buffer.tail(n)
 
 
 def clear_logs() -> None:
-    """Clear the global log buffer."""
+    """Clear the renamer log buffer."""
     log_buffer.clear()
 
 
 def get_log_queue() -> asyncio.Queue:
     """
-    Return a new async queue subscribed to all future log lines.
+    Return a new async queue subscribed to all future renamer log lines.
 
     The caller MUST call unsubscribe_log_queue(q) when done to avoid leaks.
     """
@@ -134,6 +152,34 @@ def get_log_queue() -> asyncio.Queue:
 
 
 def unsubscribe_log_queue(q: asyncio.Queue) -> None:
-    """Unsubscribe a previously subscribed queue."""
+    """Unsubscribe a previously subscribed renamer queue."""
     log_buffer.unsubscribe(q)
+
+
+# ---------------------------------------------------------------------------
+# Tracker convenience wrappers (used by tracker_api.py)
+# ---------------------------------------------------------------------------
+
+def get_recent_tracker_logs(n: int = 100) -> list[str]:
+    """Return the last n lines from the tracker log buffer."""
+    return tracker_log_buffer.tail(n)
+
+
+def clear_tracker_logs() -> None:
+    """Clear the tracker log buffer."""
+    tracker_log_buffer.clear()
+
+
+def get_tracker_log_queue() -> asyncio.Queue:
+    """
+    Return a new async queue subscribed to all future tracker log lines.
+
+    The caller MUST call unsubscribe_tracker_log_queue(q) when done.
+    """
+    return tracker_log_buffer.subscribe()
+
+
+def unsubscribe_tracker_log_queue(q: asyncio.Queue) -> None:
+    """Unsubscribe a previously subscribed tracker queue."""
+    tracker_log_buffer.unsubscribe(q)
 

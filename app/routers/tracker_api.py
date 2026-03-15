@@ -31,10 +31,10 @@ from app.config import load_config
 from app.copier import get_quota_usage, get_share_stats
 from app.database import get_session
 from app.log_buffer import (
-    clear_logs,
-    get_log_queue,
-    get_recent_logs,
-    unsubscribe_log_queue,
+    clear_tracker_logs,
+    get_tracker_log_queue,
+    get_recent_tracker_logs,
+    unsubscribe_tracker_log_queue,
 )
 from app.models import TrackedItem
 from app.scheduler import run_poll
@@ -164,20 +164,20 @@ async def trigger_poll():
 @router.get("/logs/recent", response_class=PlainTextResponse)
 def recent_logs(n: int = 100):
     """Return the last n log lines as plain text for the UI log viewer."""
-    return "\n".join(get_recent_logs(n))
+    return "\n".join(get_recent_tracker_logs(n))
 
 
 @router.post("/logs/clear", response_class=PlainTextResponse)
 def clear_log_buffer():
-    """Clear the in-memory log buffer and return empty content so the UI empties immediately."""
-    clear_logs()
+    """Clear the in-memory tracker log buffer and return empty content so the UI empties immediately."""
+    clear_tracker_logs()
     return ""
 
 
 @router.get("/logs/stream")
 async def logs_stream():
     """
-    Stream live log lines to the browser via Server-Sent Events.
+    Stream live tracker log lines to the browser via Server-Sent Events.
 
     On connect, sends the last 100 buffered lines as backlog so the client
     has immediate context. Then streams new lines as they arrive.
@@ -185,12 +185,12 @@ async def logs_stream():
     """
     from sse_starlette.sse import EventSourceResponse
 
-    queue = get_log_queue()
+    queue = get_tracker_log_queue()
 
     async def event_generator():
         try:
             # Backlog snapshot so the client sees recent history on connect
-            for line in get_recent_logs(100):
+            for line in get_recent_tracker_logs(100):
                 yield {"data": line}
             # Stream new log lines as they arrive
             while True:
@@ -200,7 +200,7 @@ async def logs_stream():
                 except asyncio.TimeoutError:
                     yield {"comment": "keepalive"}
         finally:
-            unsubscribe_log_queue(queue)
+            unsubscribe_tracker_log_queue(queue)
 
     return EventSourceResponse(event_generator())
 
