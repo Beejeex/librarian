@@ -64,6 +64,9 @@ async def run_apply(
 
     A single item error never aborts the batch — processing continues.
     """
+    # Clear buffer so the SSE stream only shows this run's output
+    log_buffer.clear()
+
     # Load all approved items ordered deterministically
     stmt = select(RenameItem).where(
         RenameItem.scan_run_id == scan_run_id,
