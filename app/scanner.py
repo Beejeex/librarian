@@ -102,7 +102,7 @@ async def run_scan(source: str, session: Session, config: AppConfig, batch_size:
         )
 
     # --- Finalise ScanRun ---
-    scan_run.total_items = total_found
+    scan_run.total_items = total_found + len(file_items)
     scan_run.status = "ready"
     session.add(scan_run)
     session.commit()

@@ -102,9 +102,10 @@ async def review(
             .order_by(ScanRun.id.desc())  # type: ignore[arg-type]
             .limit(1)
         ).first()
-        items: list[RenameItem] = []
+        folder_items: list[RenameItem] = []
+        file_items: list[RenameItem] = []
         if run:
-            items = list(
+            all_items = list(
                 session.exec(
                     select(RenameItem)
                     .where(
@@ -114,10 +115,12 @@ async def review(
                     .order_by(RenameItem.id)  # type: ignore[arg-type]
                 ).all()
             )
-        return run, items
+            folder_items = [i for i in all_items if i.item_type != "file"]
+            file_items = [i for i in all_items if i.item_type == "file"]
+        return run, folder_items, file_items
 
-    radarr_run, radarr_items = _scan_data("radarr")
-    sonarr_run, sonarr_items = _scan_data("sonarr")
+    radarr_run, radarr_folder_items, radarr_file_items = _scan_data("radarr")
+    sonarr_run, sonarr_folder_items, sonarr_file_items = _scan_data("sonarr")
 
     radarr_configured = bool(config.radarr_url and config.radarr_api_key)
     sonarr_configured = bool(config.sonarr_url and config.sonarr_api_key)
@@ -141,9 +144,11 @@ async def review(
             "request": request,
             "active_source": active_source,
             "radarr_run": radarr_run,
-            "radarr_items": radarr_items,
+            "radarr_folder_items": radarr_folder_items,
+            "radarr_file_items": radarr_file_items,
             "sonarr_run": sonarr_run,
-            "sonarr_items": sonarr_items,
+            "sonarr_folder_items": sonarr_folder_items,
+            "sonarr_file_items": sonarr_file_items,
             "batch_size": config.batch_size,
             "radarr_configured": radarr_configured,
             "sonarr_configured": sonarr_configured,
