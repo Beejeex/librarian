@@ -27,12 +27,14 @@ class AppConfig(SQLModel, table=True):
     radarr_api_key: str = ""
     radarr_root_folder: str = "/movies"
     radarr_folder_format: str = "{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}"
+    radarr_file_format: str = ""
 
     # --- Renamer: Sonarr ---
     sonarr_url: str = ""
     sonarr_api_key: str = ""
     sonarr_root_folder: str = "/tv"
     sonarr_folder_format: str = "{Series TitleYear} {tvdb-{TvdbId}}"
+    sonarr_file_format: str = ""
 
     # --- Renamer ---
     batch_size: int = 20

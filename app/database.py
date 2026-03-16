@@ -59,6 +59,9 @@ def _run_migrations() -> None:
         # Renamer: file rename support
         ("renameitem", "item_type", "VARCHAR NOT NULL DEFAULT 'folder'"),
         ("renameitem", "source_file_id", "INTEGER"),
+        # Collect Info: store file formats in DB (added v0.2.0)
+        ("appconfig", "radarr_file_format", "VARCHAR NOT NULL DEFAULT ''"),
+        ("appconfig", "sonarr_file_format", "VARCHAR NOT NULL DEFAULT ''"),
     ]
     with engine.connect() as conn:
         for table, column, definition in new_columns:
