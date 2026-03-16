@@ -41,8 +41,19 @@ class RadarrClient(BaseArrClient):
         Fetch the movie folder naming format from Radarr's naming config.
         Returns the movieFolderFormat string, or the default if not present.
         """
+        config = await self.fetch_naming_config()
+        return config["folder_format"]
+
+    async def fetch_naming_config(self) -> dict:
+        """
+        Fetch both folder and file naming formats from Radarr's naming config.
+        Returns {"folder_format": str, "file_format": str}.
+        """
         data = await self.get("/api/v3/config/naming")
-        return data.get("movieFolderFormat", DEFAULT_MOVIE_FORMAT)  # type: ignore[union-attr]
+        return {
+            "folder_format": data.get("movieFolderFormat", DEFAULT_MOVIE_FORMAT),
+            "file_format": data.get("standardMovieFormat", ""),
+        }
 
     async def update_movie_path(self, movie_id: int, new_path: str) -> None:
         """
@@ -56,6 +67,26 @@ class RadarrClient(BaseArrClient):
         movie["path"] = new_path
         await self.put(f"/api/v3/movie/{movie_id}?moveFiles=false", movie)
         logger.info("Radarr movie %s path updated to %s", movie_id, new_path)
+
+    async def fetch_root_folders(self) -> list[str]:
+        """GET /api/v3/rootfolder — list of configured root folder paths."""
+        result = await self.get("/api/v3/rootfolder")
+        if not isinstance(result, list):
+            return []
+        return [rf["path"] for rf in result if "path" in rf]
+
+    async def fetch_file_rename_proposals(self, movie_id: int) -> list[dict]:
+        """GET /api/v3/rename?movieId={movie_id} — list of proposed file renames."""
+        result = await self.get("/api/v3/rename", params={"movieId": movie_id})
+        return result if isinstance(result, list) else []
+
+    async def command_rename_files(self, movie_id: int, file_ids: list[int]) -> None:
+        """POST /api/v3/command — tell Radarr to rename specific movie files."""
+        await self.post(
+            "/api/v3/command",
+            {"name": "RenameFiles", "movieId": movie_id, "files": file_ids},
+        )
+        logger.info("Radarr rename command sent for movie %s files %s", movie_id, file_ids)
 
     async def fetch_tags(self) -> list[dict]:
         """Fetch all tags. Returns list of {id, label}."""

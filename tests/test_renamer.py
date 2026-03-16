@@ -286,3 +286,101 @@ class TestRunApply:
         db_session.refresh(item)
         assert item.status == "error"
         mock_client.update_movie_path.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# File-type RenameItems (_process_file_item)
+# ---------------------------------------------------------------------------
+def _make_file_item(db_session, scan_run_id, source="radarr", source_file_id=42):
+    """Create an approved RenameItem with item_type='file'."""
+    item = RenameItem(
+        scan_run_id=scan_run_id,
+        source=source,
+        source_id=1,
+        source_file_id=source_file_id,
+        title="Dune.2021.old.mkv",
+        current_folder="Dune.2021.old.mkv",
+        expected_folder="Dune (2021).mkv",
+        current_path="/movies/Dune (2021) {tmdb-438631}/Dune.2021.old.mkv",
+        expected_path="/movies/Dune (2021) {tmdb-438631}/Dune (2021).mkv",
+        status="approved",
+        disk_scenario="unknown",
+        item_type="file",
+    )
+    db_session.add(item)
+    db_session.commit()
+    db_session.refresh(item)
+    return item
+
+
+class TestProcessFileItem:
+    async def test_happy_path_marks_done(self, db_session, sample_config):
+        """arr rename command succeeds → item status = done."""
+        run = _make_scan_run(db_session)
+        item = _make_file_item(db_session, run.id)
+
+        mock_client = AsyncMock()
+        mock_client.command_rename_files = AsyncMock()
+
+        with patch("app.renamer.get_radarr_client", return_value=mock_client):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "done"
+        mock_client.command_rename_files.assert_called_once_with(1, [42])
+
+    async def test_missing_source_file_id_marks_error(self, db_session, sample_config):
+        """item_type='file' with source_file_id=None → error, no arr call."""
+        run = _make_scan_run(db_session)
+        item = _make_file_item(db_session, run.id, source_file_id=None)
+
+        mock_client = AsyncMock()
+
+        with patch("app.renamer.get_radarr_client", return_value=mock_client):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "error"
+        assert "source_file_id" in item.error_message
+        mock_client.command_rename_files.assert_not_called()
+
+    async def test_arr_command_failure_marks_error(self, db_session, sample_config):
+        """command_rename_files raises → item status = error with message."""
+        run = _make_scan_run(db_session)
+        item = _make_file_item(db_session, run.id)
+
+        mock_client = AsyncMock()
+        mock_client.command_rename_files = AsyncMock(side_effect=Exception("API down"))
+
+        with patch("app.renamer.get_radarr_client", return_value=mock_client):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "error"
+        assert "API down" in item.error_message
+
+    async def test_file_item_does_not_touch_disk(self, db_session, sample_config, tmp_media):
+        """File items must not trigger os.rename — arr handles the physical file."""
+        run = _make_scan_run(db_session)
+        item = _make_file_item(db_session, run.id, source="sonarr")
+
+        mock_client = AsyncMock()
+        mock_client.command_rename_files = AsyncMock()
+
+        # Snapshot existing tv dir contents before apply
+        tv_dir = tmp_media / "tv"
+        before = set(tv_dir.iterdir()) if tv_dir.exists() else set()
+
+        with (
+            patch("app.renamer.MEDIA_MOUNTS", {"radarr": str(tmp_media / "movies"), "sonarr": str(tmp_media / "tv")}),
+            patch("app.renamer.get_sonarr_client", return_value=mock_client),
+            patch("app.renamer.get_radarr_client", return_value=mock_client),
+        ):
+            await run_apply(run.id, 10, db_session, sample_config)
+
+        db_session.refresh(item)
+        assert item.status == "done"
+        mock_client.command_rename_files.assert_called_once_with(1, [42])
+        # No new entries should have appeared on disk (no os.rename called)
+        after = set(tv_dir.iterdir()) if tv_dir.exists() else set()
+        assert after == before

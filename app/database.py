@@ -56,6 +56,9 @@ def _run_migrations() -> None:
         ("appconfig", "ntfy_on_first_run", "BOOLEAN NOT NULL DEFAULT 1"),
         # Tracker: TrackedItem fields (added in v0.1.0)
         ("trackeditem", "is_upgraded", "BOOLEAN NOT NULL DEFAULT 0"),
+        # Renamer: file rename support
+        ("renameitem", "item_type", "VARCHAR NOT NULL DEFAULT 'folder'"),
+        ("renameitem", "source_file_id", "INTEGER"),
     ]
     with engine.connect() as conn:
         for table, column, definition in new_columns:

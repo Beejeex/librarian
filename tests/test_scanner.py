@@ -180,3 +180,122 @@ class TestRunScanSonarr:
             scan_run = await run_scan("sonarr", db_session, sample_config)
 
         assert scan_run.total_items == 0
+
+
+# ---------------------------------------------------------------------------
+# Custom batch_size override
+# ---------------------------------------------------------------------------
+class TestRunScanBatchSizeOverride:
+    async def test_custom_batch_size_overrides_config(self, db_session, sample_config):
+        """Passing batch_size to run_scan overrides config.batch_size."""
+        # sample_config.batch_size == 10; pass 3 explicitly
+        movies = [
+            {
+                "id": i,
+                "title": f"Film {i}",
+                "year": 2000 + i,
+                "tmdbId": 200 + i,
+                "path": f"/movies/Film.{i}.bad",
+            }
+            for i in range(1, 6)  # 5 mismatches
+        ]
+        mock_client = _make_radarr_client(movies)
+        # file rename proposals return nothing (no file items)
+        mock_client.fetch_file_rename_proposals = AsyncMock(return_value=[])
+
+        with patch("app.scanner.get_radarr_client", return_value=mock_client):
+            scan_run = await run_scan("radarr", db_session, sample_config, batch_size=3)
+
+        from sqlmodel import select
+        items = db_session.exec(select(RenameItem)).all()
+        folder_items = [i for i in items if i.item_type == "folder"]
+        assert scan_run.total_items == 5    # full count unaffected
+        assert len(folder_items) == 3       # capped at override batch_size
+
+
+# ---------------------------------------------------------------------------
+# _scan_file_renames (via run_scan)
+# ---------------------------------------------------------------------------
+class TestScanFileRenames:
+    async def test_file_proposals_create_file_items(self, db_session, sample_config):
+        """File rename proposals from arr become RenameItems with item_type='file'."""
+        movies = [
+            {"id": 1, "title": "Dune", "year": 2021, "tmdbId": 438631,
+             "path": "/movies/Dune (2021) {tmdb-438631}"},  # folder already correct
+        ]
+        proposals = [
+            {
+                "movieFileId": 42,
+                "existingPath": "/movies/Dune (2021) {tmdb-438631}/Dune.2021.old.mkv",
+                "newPath": "/movies/Dune (2021) {tmdb-438631}/Dune (2021).mkv",
+            }
+        ]
+        mock_client = _make_radarr_client(movies)
+        mock_client.fetch_file_rename_proposals = AsyncMock(return_value=proposals)
+
+        with (
+            patch("app.scanner.get_radarr_client", return_value=mock_client),
+            patch("app.scanner.MEDIA_MOUNTS", {}),  # skip disk check for folder items
+        ):
+            scan_run = await run_scan("radarr", db_session, sample_config)
+
+        from sqlmodel import select
+        items = db_session.exec(select(RenameItem)).all()
+        file_items = [i for i in items if i.item_type == "file"]
+        assert len(file_items) == 1
+        fi = file_items[0]
+        assert fi.source_file_id == 42
+        assert fi.current_folder == "Dune.2021.old.mkv"
+        assert fi.expected_folder == "Dune (2021).mkv"
+        assert fi.status == "pending"
+        assert fi.disk_scenario == "unknown"
+
+    async def test_file_proposal_api_failure_skips_item(self, db_session, sample_config):
+        """If fetch_file_rename_proposals raises for an item, it is silently skipped."""
+        movies = [
+            {"id": 1, "title": "Dune", "year": 2021, "tmdbId": 438631,
+             "path": "/movies/Dune (2021) {tmdb-438631}"},
+        ]
+        mock_client = _make_radarr_client(movies)
+        mock_client.fetch_file_rename_proposals = AsyncMock(side_effect=Exception("timeout"))
+
+        with (
+            patch("app.scanner.get_radarr_client", return_value=mock_client),
+            patch("app.scanner.MEDIA_MOUNTS", {}),
+        ):
+            scan_run = await run_scan("radarr", db_session, sample_config)
+
+        from sqlmodel import select
+        items = db_session.exec(select(RenameItem)).all()
+        file_items = [i for i in items if i.item_type == "file"]
+        assert file_items == []  # failure silently skipped
+        assert scan_run.status == "ready"  # overall scan still succeeds
+
+    async def test_file_items_respect_batch_size_limit(self, db_session, sample_config):
+        """_scan_file_renames stops adding items once batch_size is reached."""
+        movies = [
+            {"id": i, "title": f"M{i}", "year": 2000 + i, "tmdbId": 100 + i,
+             "path": f"/movies/M{i} ({2000+i}) {{tmdb-{100+i}}}"}
+            for i in range(1, 4)
+        ]
+        # Every movie returns 3 proposals → 9 total, but batch_size=5
+        proposals = [
+            {"movieFileId": j, "existingPath": f"/movies/x/File{j}.old.mkv",
+             "newPath": f"/movies/x/File{j}.mkv"}
+            for j in range(3)
+        ]
+        mock_client = _make_radarr_client(movies)
+        mock_client.fetch_file_rename_proposals = AsyncMock(return_value=proposals)
+
+        with (
+            patch("app.scanner.get_radarr_client", return_value=mock_client),
+            patch("app.scanner.MEDIA_MOUNTS", {}),
+        ):
+            scan_run = await run_scan("radarr", db_session, sample_config, batch_size=5)
+
+        from sqlmodel import select
+        file_items = [
+            i for i in db_session.exec(select(RenameItem)).all()
+            if i.item_type == "file"
+        ]
+        assert len(file_items) <= 5

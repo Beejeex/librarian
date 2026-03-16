@@ -9,6 +9,7 @@ Re-scanning clears all pending/approved/skipped items for the source and
 rebuilds the list fresh from the current arr state.
 """
 
+import asyncio
 import logging
 import os
 import re
@@ -23,7 +24,7 @@ from app.renamer import MEDIA_MOUNTS, remap_to_container
 logger = logging.getLogger(__name__)
 
 
-async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
+async def run_scan(source: str, session: Session, config: AppConfig, batch_size: int | None = None) -> ScanRun:
     """
     Scan Radarr or Sonarr for folder name mismatches and record them in the DB.
 
@@ -64,7 +65,7 @@ async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
     # --- Compare and record mismatches ---
     mismatch_count = 0
     total_found = 0
-    batch_size = config.batch_size
+    batch_size = batch_size if batch_size and batch_size > 0 else config.batch_size
     root_folder = (
         config.radarr_root_folder if source == "radarr" else config.sonarr_root_folder
     )
@@ -83,6 +84,23 @@ async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
 
     session.commit()
 
+    # --- Scan file rename proposals ---
+    file_items = await _scan_file_renames(
+        source=source,
+        client=client,
+        items=items,
+        scan_run_id=scan_run.id,
+        batch_size=batch_size,
+    )
+    for fi in file_items:
+        session.add(fi)
+    if file_items:
+        session.commit()
+        logger.info(
+            "ScanRun %s: %s file rename proposal(s) added for %s",
+            scan_run.id, len(file_items), source,
+        )
+
     # --- Finalise ScanRun ---
     scan_run.total_items = total_found
     scan_run.status = "ready"
@@ -98,6 +116,63 @@ async def run_scan(source: str, session: Session, config: AppConfig) -> ScanRun:
         mismatch_count,
     )
     return scan_run
+
+
+async def _scan_file_renames(
+    source: str,
+    client,
+    items: list[dict],
+    scan_run_id: int,
+    batch_size: int,
+) -> list[RenameItem]:
+    """
+    Fetch file rename proposals from arr for all movies/series.
+
+    Uses asyncio.gather with a semaphore to cap concurrent API requests.
+    Returns up to batch_size RenameItem rows with item_type="file".
+    """
+    sem = asyncio.Semaphore(20)
+    file_id_key = "movieFileId" if source == "radarr" else "episodeFileId"
+
+    async def fetch_proposals(item: dict) -> list[dict]:
+        async with sem:
+            try:
+                return await client.fetch_file_rename_proposals(item["id"])
+            except Exception as exc:
+                logger.debug(
+                    "File rename proposals fetch failed for %s id=%s: %s",
+                    source, item.get("id"), exc,
+                )
+                return []
+
+    all_proposals: list[list[dict]] = list(
+        await asyncio.gather(*[fetch_proposals(m) for m in items])
+    )
+
+    result: list[RenameItem] = []
+    for item, proposals in zip(items, all_proposals):
+        for p in proposals:
+            current_basename = os.path.basename(p["existingPath"])
+            expected_basename = os.path.basename(p["newPath"])
+            result.append(
+                RenameItem(
+                    scan_run_id=scan_run_id,
+                    source=source,
+                    source_id=item["id"],
+                    source_file_id=p.get(file_id_key),
+                    title=current_basename,
+                    current_folder=current_basename,
+                    expected_folder=expected_basename,
+                    current_path=p["existingPath"],
+                    expected_path=p["newPath"],
+                    status="pending",
+                    disk_scenario="unknown",
+                    item_type="file",
+                )
+            )
+            if len(result) >= batch_size:
+                return result
+    return result
 
 
 def _clear_previous_items(source: str, session: Session) -> None:

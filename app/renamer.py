@@ -133,6 +133,11 @@ async def _process_item(
     source = item.source
     media_mount = MEDIA_MOUNTS[source]
 
+    # File renames are delegated entirely to arr's RenameFiles command
+    if item.item_type == "file":
+        await _process_file_item(item, session, config)
+        return
+
     try:
         old_local = remap_to_container(item.current_path, root_folder, media_mount)
         parent_dir = os.path.dirname(old_local)
@@ -260,6 +265,48 @@ async def _process_item(
         logger.error(
             "arr update failed for item %s after disk operation: %s", item.id, exc
         )
+
+    item.updated_at = datetime.now(UTC)
+    session.add(item)
+    session.commit()
+
+
+async def _process_file_item(
+    item: RenameItem,
+    session: Session,
+    config: AppConfig,
+) -> None:
+    """
+    For file-type RenameItems, tell arr to rename the file via its command API.
+
+    Radarr/Sonarr handle the physical rename and DB update atomically.
+    We fire the command and mark the item done immediately.
+    """
+    if item.source_file_id is None:
+        _mark_error(item, "source_file_id missing — cannot issue arr rename command", session)
+        log_buffer.append(f"[{item.title}] ERROR: source_file_id missing")
+        return
+
+    log_buffer.append(f"[{item.title}]  [file rename]")
+    log_buffer.append(f"  {item.current_folder}")
+    log_buffer.append(f"  → {item.expected_folder}")
+
+    try:
+        if item.source == "radarr":
+            client = get_radarr_client(config)
+            await client.command_rename_files(item.source_id, [item.source_file_id])
+        else:
+            client = get_sonarr_client(config)
+            await client.command_rename_files(item.source_id, [item.source_file_id])
+        item.status = "done"
+        log_buffer.append(f"  ↳ arr rename command queued")
+        logger.info(
+            "File rename command sent for item %s (file_id=%s)", item.id, item.source_file_id
+        )
+    except Exception as exc:
+        _mark_error(item, f"Arr rename command failed: {exc}", session)
+        log_buffer.append(f"  ↳ arr rename command FAILED: {exc}")
+        logger.error("File rename command failed for item %s: %s", item.id, exc)
 
     item.updated_at = datetime.now(UTC)
     session.add(item)

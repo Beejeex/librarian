@@ -50,6 +50,7 @@ async def health() -> dict:
 # ---------------------------------------------------------------------------
 class ScanRequest(BaseModel):
     source: str  # "radarr" or "sonarr"
+    batch_size: int | None = None  # override config.batch_size for this scan
 
 
 @router.post("/api/scan", tags=["scan"])
@@ -68,7 +69,7 @@ async def trigger_scan(
 
     config = get_config(session)
     try:
-        scan_run = await run_scan(body.source, session, config)
+        scan_run = await run_scan(body.source, session, config, batch_size=body.batch_size)
     except Exception as exc:
         logger.error("Scan failed for source=%s: %s", body.source, exc)
         # Return error payload instead of crashing — UI displays it as an alert
@@ -209,9 +210,9 @@ class TestConnectionRequest(BaseModel):
 @router.post("/api/test-connection", tags=["settings"])
 async def test_connection(body: TestConnectionRequest) -> dict:
     """
-    Test connectivity to Radarr or Sonarr and return the folder naming format.
+    Collect info from Radarr or Sonarr: folder naming format and root folders.
 
-    Returns: { success: bool, folder_format: str, error?: str }
+    Returns: { success: bool, folder_format: str, file_format: str, root_folders: list[str], error?: str }
     """
     if body.source not in ("radarr", "sonarr"):
         raise HTTPException(status_code=400, detail="source must be 'radarr' or 'sonarr'")
@@ -224,11 +225,17 @@ async def test_connection(body: TestConnectionRequest) -> dict:
             client = RadarrClient(body.url, body.api_key)
         else:
             client = SonarrClient(body.url, body.api_key)
-        folder_format = await client.fetch_folder_format()
-        return {"success": True, "folder_format": folder_format}
+        naming = await client.fetch_naming_config()
+        root_folders = await client.fetch_root_folders()
+        return {
+            "success": True,
+            "folder_format": naming["folder_format"],
+            "file_format": naming["file_format"],
+            "root_folders": root_folders,
+        }
     except Exception as exc:
-        logger.warning("Test connection failed for source=%s: %s", body.source, exc)
-        return {"success": False, "folder_format": "", "error": str(exc)}
+        logger.warning("Collect info failed for source=%s: %s", body.source, exc)
+        return {"success": False, "folder_format": "", "file_format": "", "root_folders": [], "error": str(exc)}
 
 
 # ---------------------------------------------------------------------------
