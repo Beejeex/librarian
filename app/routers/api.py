@@ -145,6 +145,8 @@ async def skip_item(
 
 class ApproveAllRequest(BaseModel):
     scan_run_id: int
+    source: str | None = None
+    item_type: str | None = None
 
 
 @router.post("/api/items/approve-all", tags=["items"])
@@ -152,11 +154,16 @@ async def approve_all_items(
     body: ApproveAllRequest,
     session: Session = Depends(get_session),
 ) -> dict:
-    """Approve all pending RenameItems for a given ScanRun."""
-    stmt = select(RenameItem).where(
+    """Approve all pending RenameItems for a given ScanRun, optionally filtered by source and item_type."""
+    conditions = [
         RenameItem.scan_run_id == body.scan_run_id,
         RenameItem.status == "pending",
-    )
+    ]
+    if body.source:
+        conditions.append(RenameItem.source == body.source)  # type: ignore[arg-type]
+    if body.item_type:
+        conditions.append(RenameItem.item_type == body.item_type)  # type: ignore[arg-type]
+    stmt = select(RenameItem).where(*conditions)
     items = session.exec(stmt).all()
     for item in items:
         item.status = "approved"

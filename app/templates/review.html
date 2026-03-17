@@ -118,7 +118,7 @@
   async approveAll() {
     await fetch('/api/items/approve-all', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({scan_run_id: this.scanRunId})
+      body: JSON.stringify({scan_run_id: this.scanRunId, source: '{{ src_key }}', item_type: 'folder'})
     });
     location.reload();
   },
@@ -245,7 +245,7 @@
   async approveAll() {
     await fetch('/api/items/approve-all', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({scan_run_id: this.scanRunId})
+      body: JSON.stringify({scan_run_id: this.scanRunId, source: '{{ src_key }}', item_type: 'file'})
     });
     location.reload();
   },

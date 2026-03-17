@@ -156,3 +156,25 @@ class TestApproveAll:
         )
         assert response.status_code == 200
         assert response.json()["approved"] == 0
+
+    def test_source_filter_limits_approval(self, seeded_client):
+        """Only radarr folder items approved when source=radarr, item_type=folder."""
+        client, item1_id, item2_id, run_id = seeded_client
+        response = client.post(
+            "/api/items/approve-all",
+            json={"scan_run_id": run_id, "source": "sonarr", "item_type": "folder"},
+        )
+        assert response.status_code == 200
+        # Both seeded items are radarr — sonarr filter should approve nothing
+        assert response.json()["approved"] == 0
+
+    def test_item_type_filter_limits_approval(self, seeded_client):
+        """Only file items approved when item_type=file (seeded items are folders)."""
+        client, item1_id, item2_id, run_id = seeded_client
+        response = client.post(
+            "/api/items/approve-all",
+            json={"scan_run_id": run_id, "source": "radarr", "item_type": "file"},
+        )
+        assert response.status_code == 200
+        # Seeded items have item_type=folder (default) — file filter should match none
+        assert response.json()["approved"] == 0
