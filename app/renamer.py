@@ -127,7 +127,7 @@ async def _process_item(
       arr_only  — disk already has expected name → update arr path only
       disk_only — arr already has expected name, disk still has old name → rename disk only
       collision — both old and new exist on disk → error, skip (unsafe to rename)
-      missing   — neither folder exists on disk  → error, skip
+      missing   — neither folder exists on disk  → update arr path only (disk skipped)
       unknown   — scenario was not classified at scan time → re-check live
     """
     source = item.source
@@ -214,16 +214,27 @@ async def _process_item(
 
     if scenario == "missing":
         if item.current_folder == item.expected_folder:
-            msg = (
-                f"Arr path is already correct ('{item.expected_folder}') but the folder "
-                f"does not exist on disk at {old_local}. Check the mount and Radarr/Sonarr path settings."
+            # Arr path already correct, folder absent from disk — nothing to rename.
+            log_buffer.append(
+                f"  ↳ arr path already correct but folder absent from disk — skipped"
             )
+            logger.warning(
+                "Missing folder for item %s (arr already correct): %s", item.id, old_local
+            )
+            item.status = "done"
+            item.updated_at = datetime.now(UTC)
+            session.add(item)
+            session.commit()
+            return
         else:
-            msg = f"Folder '{item.current_folder}' not found on disk at {old_local}"
-        _mark_error(item, msg, session)
-        log_buffer.append(f"  ↳ MISSING — folder not found on disk, skipped")
-        logger.warning("Missing folder for item %s: %s", item.id, msg)
-        return
+            # Folder absent from disk (possibly offline/unmounted) — update arr path only.
+            log_buffer.append(
+                f"  ↳ folder not on disk — updating arr path only"
+            )
+            logger.info(
+                "Missing folder for item %s — arr-only update (disk not accessible)", item.id
+            )
+            scenario = "arr_only"
 
     if scenario == "rename":
         # Normal path: rename folder on disk first

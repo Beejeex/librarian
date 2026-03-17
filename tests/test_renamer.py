@@ -109,8 +109,11 @@ class TestRunApply:
 
     async def test_disk_rename_failure_marks_error(self, db_session, sample_config, tmp_media):
         """
-        If os.rename raises (missing scenario), item is marked error and arr PUT is NOT called.
+        collision scenario: both old and new exist on disk — item is marked error,
+        arr PUT is NOT called.
         """
+        (tmp_media / "movies" / "NonExistent").mkdir(parents=True, exist_ok=True)
+        (tmp_media / "movies" / "Target Folder").mkdir(parents=True, exist_ok=True)
         run = _make_scan_run(db_session)
         item = _make_item(
             db_session,
@@ -118,7 +121,7 @@ class TestRunApply:
             current_path="/movies/NonExistent",
             expected_folder="Target Folder",
             expected_path="/movies/Target Folder",
-            disk_scenario="missing",
+            disk_scenario="collision",
         )
 
         mock_client = AsyncMock()
@@ -171,13 +174,13 @@ class TestRunApply:
         (tmp_media / "movies" / "GoodMovie").mkdir(parents=True, exist_ok=True)
 
         run = _make_scan_run(db_session)
-        # item 1: missing scenario → will error
+        # item 1: collision scenario → will error
         item1 = _make_item(
             db_session, run.id,
             current_path="/movies/NonExistent",
             expected_folder="Target1",
             expected_path="/movies/Target1",
-            disk_scenario="missing",
+            disk_scenario="collision",
         )
         # item 2: normal rename scenario → should succeed
         item2 = _make_item(
@@ -262,9 +265,10 @@ class TestRunApply:
         assert "collision" in item.error_message.lower() or "both" in item.error_message.lower()
         mock_client.update_movie_path.assert_not_called()
 
-    async def test_missing_scenario_marks_error_no_arr_call(self, db_session, sample_config, tmp_media):
+    async def test_missing_scenario_updates_arr_marks_done(self, db_session, sample_config, tmp_media):
         """
-        missing scenario: neither old nor new folder exists — must error, no arr call.
+        missing scenario (different names): folder absent from disk — arr path is still
+        updated (arr-only) and item is marked done. No disk rename attempted.
         """
         run = _make_scan_run(db_session)
         item = _make_item(
@@ -276,6 +280,7 @@ class TestRunApply:
         )
 
         mock_client = AsyncMock()
+        mock_client.update_movie_path = AsyncMock()
 
         with (
             patch("app.renamer.MEDIA_MOUNTS", {"radarr": str(tmp_media / "movies"), "sonarr": str(tmp_media / "tv")}),
@@ -284,8 +289,8 @@ class TestRunApply:
             await run_apply(run.id, 10, db_session, sample_config)
 
         db_session.refresh(item)
-        assert item.status == "error"
-        mock_client.update_movie_path.assert_not_called()
+        assert item.status == "done"
+        mock_client.update_movie_path.assert_called_once()
 
 
 # ---------------------------------------------------------------------------
