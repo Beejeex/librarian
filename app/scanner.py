@@ -227,6 +227,19 @@ def _build_rename_item(
     else:
         expected_folder = series_folder_name(item, folder_format)
 
+    # If the expected name has year=0 (unreleased/not yet imported) and the current
+    # folder already carries the correct tmdb/tvdb ID, there is nothing useful to do
+    # until the file arrives — skip it.  If the ID is absent from the current folder
+    # we still want to flag it so we can add the ID suffix.
+    if "(0)" in expected_folder:
+        id_match = re.search(r"\{(?:tmdb|tvdb)-\d+\}", expected_folder)
+        if id_match and id_match.group() in current_folder:
+            logger.debug(
+                "Skipping %r: year unknown and %s already in folder name",
+                item.get("title"), id_match.group(),
+            )
+            return None
+
     media_mount = MEDIA_MOUNTS.get(source, "")
 
     if current_folder == expected_folder:
