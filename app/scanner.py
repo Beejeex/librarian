@@ -267,22 +267,14 @@ def _build_rename_item(
                             disk_scenario="disk_only",
                         )
                     else:
-                        # Disk folder truly not found anywhere — surface as missing.
-                        logger.warning(
-                            "Arr path correct but folder missing on disk: %s", current_path
+                        # Disk folder truly not found anywhere and arr path is already
+                        # correct — content is not on disk yet (e.g. unreleased film).
+                        # Nothing to rename; skip silently.
+                        logger.debug(
+                            "Skipping %r: arr path correct, folder not on disk (not yet imported?)",
+                            item.get("title"),
                         )
-                        return RenameItem(
-                            scan_run_id=scan_run_id,
-                            source=source,
-                            source_id=item["id"],
-                            title=item["title"],
-                            current_folder=current_folder,
-                            expected_folder=expected_folder,
-                            current_path=current_path,
-                            expected_path=current_path,
-                            status="pending",
-                            disk_scenario="missing",
-                        )
+                        pass
             except (ValueError, OSError):
                 pass
         return None  # arr and disk both correct
