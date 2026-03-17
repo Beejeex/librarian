@@ -58,8 +58,8 @@
 </tr>
 {% endmacro %}
 
-{# ── Main panel macro ── #}
-{% macro source_panel(label, icon, src_key, scan_run, folder_items, file_items, batch_size) %}
+{# ── Folder panel macro ── #}
+{% macro folder_panel(label, icon, src_key, scan_run, folder_items, batch_size) %}
 {% if not scan_run %}
 <div class="card">
   <p style="color:#64748b;">No scan has been run for <strong>{{ label }}</strong> yet. <a href="/">Go to the dashboard to scan.</a></p>
@@ -68,11 +68,11 @@
 <div class="card" x-data="{}" x-init="setTimeout(() => location.reload(), 2000)">
   <p style="color:#64748b;">⏳ Scan in progress… refreshing automatically.</p>
 </div>
-{% elif folder_items | length == 0 and file_items | length == 0 %}
+{% elif folder_items | length == 0 %}
 <div class="card">
   {% if scan_run.status == "done" %}
   <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-    <span>{{ icon }} Last scan for {{ label }} is fully applied ({{ scan_run.done_count }} renamed, {{ scan_run.error_count }} errors).</span>
+    <span>{{ icon }} {{ label }} folders — all applied ({{ scan_run.done_count }} renamed, {{ scan_run.error_count }} errors).</span>
     <button class="btn btn-primary" x-data="{ loading: false }"
       @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
       <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
@@ -88,7 +88,7 @@
   </div>
   {% else %}
   <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
-    <span>{{ icon }} {{ label }} — no renames needed.</span>
+    <span>{{ icon }} {{ label }} — no folder renames needed.</span>
     <button class="btn btn-primary" x-data="{ loading: false }"
       @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
       <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
@@ -114,17 +114,11 @@
     window.location = '/apply?scan_run_id=' + this.scanRunId + '&batch_size=' + this.batchSize;
   }
 }">
-  {# ── Toolbar ── #}
   <div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;">
     <span style="font-size:.875rem;color:#64748b;">
-      {% set total_visible = folder_items | length + file_items | length %}
-      {% set total_approved = (folder_items + file_items) | selectattr('status','eq','approved') | list | length %}
       <strong>{{ folder_items | length }}</strong> folder{% if folder_items | length != 1 %}s{% endif %}
       &nbsp;·&nbsp;
-      <strong>{{ file_items | length }}</strong> file{% if file_items | length != 1 %}s{% endif %}
-      &nbsp;·&nbsp;
-      <strong>{{ total_approved }}</strong> approved
-      {% if scan_run.total_items > (folder_items | length + file_items | length) %}&nbsp;·&nbsp;<strong>{{ scan_run.total_items }}</strong> total found{% endif %}
+      <strong>{{ folder_items | selectattr('status','eq','approved') | list | length }}</strong> approved
     </span>
     <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
       <label style="font-size:.875rem;font-weight:600;margin:0;">Batch:</label>
@@ -140,18 +134,12 @@
       <span x-show="!applying">Apply</span><span x-show="applying">Starting…</span>
     </button>
   </div>
-
-  {# ── Folder mismatches ── #}
-  {% if folder_items | length > 0 %}
   <div class="card" style="padding:0;overflow:hidden;">
     {% if folder_items | length >= batch_size %}
     <div style="background:#fef9c3;color:#92400e;padding:.6rem 1.25rem;font-size:.85rem;border-bottom:1px solid #fde68a;">
       Showing first {{ batch_size }} folder mismatches. Approve → Apply → Re-scan for more.
     </div>
     {% endif %}
-    <div style="padding:.6rem 1.25rem .4rem;font-size:.8rem;font-weight:600;color:#475569;border-bottom:1px solid #e2e8f0;background:#f8fafc;">
-      📁 Folder renames
-    </div>
     <table>
       <thead>
         <tr>
@@ -169,15 +157,77 @@
       </tbody>
     </table>
   </div>
-  {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
 
-  {# ── File renames ── #}
-  {% if file_items | length > 0 %}
-  <div class="card" style="padding:0;overflow:hidden;margin-top:1rem;">
-    <div style="padding:.6rem 1.25rem .4rem;font-size:.8rem;font-weight:600;color:#6d28d9;border-bottom:1px solid #ede9fe;background:#faf5ff;display:flex;align-items:center;gap:.5rem;">
-      🗂 File renames
-      <span style="font-weight:400;font-size:.75rem;color:#7c3aed;">— sent to {{ label }} as a rename command; includes subtitles, .nfo, and all associated files</span>
+{# ── File panel macro ── #}
+{% macro file_panel(label, icon, src_key, scan_run, file_items, batch_size) %}
+{% if not scan_run %}
+<div class="card">
+  <p style="color:#64748b;">No scan has been run for <strong>{{ label }}</strong> yet. <a href="/">Go to the dashboard to scan.</a></p>
+</div>
+{% elif scan_run.status == "scanning" %}
+<div class="card" x-data="{}" x-init="setTimeout(() => location.reload(), 2000)">
+  <p style="color:#64748b;">⏳ Scan in progress… refreshing automatically.</p>
+</div>
+{% elif file_items | length == 0 %}
+<div class="card">
+  {% if scan_run.status == "error" %}
+  <div class="alert" style="background:#fee2e2;color:#b91c1c;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <span>{{ icon }} Scan for {{ label }} encountered an error.</span>
+    <button class="btn btn-primary" x-data="{ loading: false }"
+      @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+      <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
+    </button>
+  </div>
+  {% else %}
+  <div class="alert alert-success" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+    <span>{{ icon }} {{ label }} — no file renames needed.</span>
+    <button class="btn btn-primary" x-data="{ loading: false }"
+      @click="loading=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+      <span x-show="!loading">🔄 Re-scan {{ label }}</span><span x-show="loading">Scanning…</span>
+    </button>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div x-data="{
+  batchSize: {{ batch_size }},
+  scanRunId: {{ scan_run.id }},
+  applying: false,
+  scanning: false,
+  async approveAll() {
+    await fetch('/api/items/approve-all', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({scan_run_id: this.scanRunId})
+    });
+    location.reload();
+  },
+  async startApply() {
+    this.applying = true;
+    window.location = '/apply?scan_run_id=' + this.scanRunId + '&batch_size=' + this.batchSize;
+  }
+}">
+  <div class="card" style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem 1.5rem;">
+    <span style="font-size:.875rem;color:#64748b;">
+      <strong>{{ file_items | length }}</strong> file{% if file_items | length != 1 %}s{% endif %}
+      &nbsp;·&nbsp;
+      <strong>{{ file_items | selectattr('status','eq','approved') | list | length }}</strong> approved
+      <span style="color:#7c3aed;">&nbsp;— renamed by {{ label }}, includes subs &amp; .nfo</span>
+    </span>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+      <button class="btn btn-ghost" @click="approveAll()">Approve All</button>
+      <button class="btn btn-ghost" :disabled="scanning"
+        @click="scanning=true; fetch('/api/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'{{ src_key }}'})}).then(()=>location.reload())">
+        <span x-show="!scanning">🔄 Re-scan</span><span x-show="scanning">Scanning…</span>
+      </button>
+      <button class="btn btn-success" :disabled="applying" @click="startApply()">
+        <span x-show="!applying">Apply</span><span x-show="applying">Starting…</span>
+      </button>
     </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden;">
     <table>
       <thead>
         <tr>
@@ -195,30 +245,42 @@
       </tbody>
     </table>
   </div>
-  {% endif %}
-
 </div>
 {% endif %}
 {% endmacro %}
 
-{# ── Tab bar ── #}
-<div x-data="{ tab: '{{ active_source }}' }">
+{# ── 4-tab bar ── #}
+<div x-data="{ tab: '{{ active_source }}_folders' }">
   <div class="tab-nav">
     <button type="button" class="tab-btn"
-            :class="tab==='radarr' ? 'tab-active' : ''"
+            :class="tab==='radarr_folders' ? 'tab-active' : ''"
             {% if not radarr_configured %}disabled title="Radarr is not configured"{% endif %}
-            @click="tab='radarr'">🎬 Radarr</button>
+            @click="tab='radarr_folders'">🎬 Radarr Folders</button>
     <button type="button" class="tab-btn"
-            :class="tab==='sonarr' ? 'tab-active' : ''"
+            :class="tab==='radarr_files' ? 'tab-active' : ''"
+            {% if not radarr_configured %}disabled title="Radarr is not configured"{% endif %}
+            @click="tab='radarr_files'">🎬 Radarr Files</button>
+    <button type="button" class="tab-btn"
+            :class="tab==='sonarr_folders' ? 'tab-active' : ''"
             {% if not sonarr_configured %}disabled title="Sonarr is not configured"{% endif %}
-            @click="tab='sonarr'">📺 Sonarr</button>
+            @click="tab='sonarr_folders'">📺 Sonarr Folders</button>
+    <button type="button" class="tab-btn"
+            :class="tab==='sonarr_files' ? 'tab-active' : ''"
+            {% if not sonarr_configured %}disabled title="Sonarr is not configured"{% endif %}
+            @click="tab='sonarr_files'">📺 Sonarr Files</button>
   </div>
 
-  <div x-show="tab === 'radarr'">
-    {{ source_panel('Radarr', '🎬', 'radarr', radarr_run, radarr_folder_items, radarr_file_items, batch_size) }}
+  <div x-show="tab === 'radarr_folders'">
+    {{ folder_panel('Radarr', '🎬', 'radarr', radarr_run, radarr_folder_items, batch_size) }}
   </div>
-  <div x-show="tab === 'sonarr'">
-    {{ source_panel('Sonarr', '📺', 'sonarr', sonarr_run, sonarr_folder_items, sonarr_file_items, batch_size) }}
+  <div x-show="tab === 'radarr_files'">
+    {{ file_panel('Radarr', '🎬', 'radarr', radarr_run, radarr_file_items, batch_size) }}
+  </div>
+  <div x-show="tab === 'sonarr_folders'">
+    {{ folder_panel('Sonarr', '📺', 'sonarr', sonarr_run, sonarr_folder_items, batch_size) }}
+  </div>
+  <div x-show="tab === 'sonarr_files'">
+    {{ file_panel('Sonarr', '📺', 'sonarr', sonarr_run, sonarr_file_items, batch_size) }}
   </div>
 </div>
 {% endblock %}
