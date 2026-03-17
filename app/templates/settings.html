@@ -198,6 +198,15 @@
         How many folders to scan and rename per run.
       </p>
     </div>
+    <div style="margin-top:1rem;display:flex;align-items:center;gap:.75rem;">
+      <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-weight:500;">
+        <input type="checkbox" id="scan_file_renames" name="scan_file_renames"
+               value="true" {% if config.scan_file_renames %}checked{% endif %}
+               style="accent-color:#3b82f6;width:16px;height:16px;">
+        Enable file rename scanning
+      </label>
+      <p style="font-size:.8rem;color:#94a3b8;margin:0;">When enabled, scans for file-level renames (movies, episodes, subtitles) in addition to folder renames.</p>
+    </div>
   </div>
 
   </div>{# end Librarian tab #}

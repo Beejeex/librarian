@@ -38,6 +38,7 @@ class AppConfig(SQLModel, table=True):
 
     # --- Renamer ---
     batch_size: int = 20
+    scan_file_renames: bool = True  # when False, file rename proposals are skipped during scan
 
     # --- Tracker: tags ---
     radarr_tags: str = ""  # Comma-separated tag names to watch in Radarr

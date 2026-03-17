@@ -85,13 +85,17 @@ async def run_scan(source: str, session: Session, config: AppConfig, batch_size:
     session.commit()
 
     # --- Scan file rename proposals ---
-    file_items = await _scan_file_renames(
-        source=source,
-        client=client,
-        items=items,
-        scan_run_id=scan_run.id,
-        batch_size=batch_size,
-    )
+    if config.scan_file_renames:
+        file_items = await _scan_file_renames(
+            source=source,
+            client=client,
+            items=items,
+            scan_run_id=scan_run.id,
+            batch_size=batch_size,
+        )
+    else:
+        file_items = []
+        logger.info("File rename scanning disabled — skipping file proposals for %s", source)
     for fi in file_items:
         session.add(fi)
     if file_items:
