@@ -34,7 +34,7 @@ class LogBuffer:
     Old lines are automatically discarded when maxlen is reached.
     """
 
-    def __init__(self, maxlen: int = 500) -> None:
+    def __init__(self, maxlen: int = 2000) -> None:
         self._buffer: deque[str] = deque(maxlen=maxlen)
         self._lock = threading.Lock()
         # Async listeners: a list of asyncio.Queue objects — one per SSE client.
@@ -76,7 +76,7 @@ class LogBuffer:
         Return a new asyncio.Queue that will receive all future appended lines.
         Call unsubscribe() when the SSE client disconnects to avoid leaking queues.
         """
-        q: asyncio.Queue = asyncio.Queue(maxsize=200)
+        q: asyncio.Queue = asyncio.Queue(maxsize=2000)
         with self._queues_lock:
             self._queues.append(q)
         return q

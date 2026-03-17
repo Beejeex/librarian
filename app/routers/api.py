@@ -244,20 +244,30 @@ async def test_connection(body: TestConnectionRequest) -> dict:
 @router.get("/api/stream", tags=["apply"])
 async def stream_logs() -> EventSourceResponse:
     """
-    Server-Sent Events endpoint.  Tails log_buffer and pushes new lines.
+    Server-Sent Events endpoint.  Subscribes to log_buffer and pushes new lines.
     The client disconnects when done; we stop on '[DONE]' sentinel.
     """
     async def _generator() -> AsyncIterator[dict]:
-        sent_index = 0
-        while True:
-            lines = log_buffer.tail(500)
-            new_lines = lines[sent_index:]
-            for line in new_lines:
+        q = log_buffer.subscribe()
+        try:
+            # Replay any lines already in the buffer (e.g. client reconnected mid-apply)
+            for line in log_buffer.tail(500):
                 yield {"data": line}
-                sent_index += 1
                 if line.startswith("[DONE]"):
                     return
-            await asyncio.sleep(0.3)
+            # Then stream new lines as they arrive
+            while True:
+                try:
+                    line = await asyncio.wait_for(q.get(), timeout=15.0)
+                except asyncio.TimeoutError:
+                    # Send a keep-alive comment so the connection stays open
+                    yield {"comment": "keepalive"}
+                    continue
+                yield {"data": line}
+                if line.startswith("[DONE]"):
+                    return
+        finally:
+            log_buffer.unsubscribe(q)
 
     return EventSourceResponse(_generator())
 
