@@ -93,19 +93,29 @@ Both tools run in the same container, share the same SQLite database, and are ac
 1. User selects **Radarr** or **Sonarr** and clicks **Scan**.
 2. App fetches all movies/series from the arr API.
 3. For each item, compute the expected folder name using the naming template.
-4. Items where current ≠ expected are written to the DB as `RenameItem` with `status=pending`.
-5. Each item's `disk_scenario` is classified by checking if old/new paths exist on disk.
+4. Folder mismatches are written to DB as `RenameItem` with `item_type="folder"`, `status=pending`.
+5. Each folder item's `disk_scenario` is classified by checking if old/new paths exist on disk.
+6. File rename proposals are fetched via `GET /api/v3/rename` and written as `RenameItem` with `item_type="file"`, `source_file_id` set, `disk_scenario="file"`.
+7. `scan_run.total_items` = folder mismatches + file rename proposals.
 
 ### Phase 2 — Review
-- Shows a table: **Current Name → Expected Name** with a coloured **Scenario** badge per row.
-- User can approve / skip individual items or **Approve All**.
+- Four tabs: **Radarr Folders**, **Radarr Files**, **Sonarr Folders**, **Sonarr Files**.
+- Each tab has its own toolbar: Approve All, Apply, Re-scan.
+- Folder tab shows items up to `batch_size`; File tab shows all file items (no batch limit).
+- User can approve / skip individual items or **Approve All** within a tab.
 
 ### Phase 3 — Apply
-Scenario determines behaviour per item:
+Behaviour is determined by `item_type` and `disk_scenario`:
+
+**Folder items** (`item_type="folder"`):
 - `rename` — rename on disk + update arr path
 - `arr_only` — skip disk, update arr path only
 - `collision` — error immediately (both old and new folder exist)
 - `missing` — error immediately (neither folder exists)
+
+**File items** (`item_type="file"`):
+- Librarian sends `POST /api/v3/command {"name":"RenameFiles", "movieId":X, "files":[fileId]}` to arr.
+- Arr handles physical rename + subs + .nfo atomically. Librarian does **not** touch the file directly.
 
 ### Disk Scenario Values
 | Scenario | Old exists | New exists | Action |
@@ -115,6 +125,7 @@ Scenario determines behaviour per item:
 | `collision` | ✓ | ✓ | Error — skip |
 | `missing` | ✗ | ✗ | Error — skip |
 | `unknown` | — | — | Re-classify live at apply time |
+| `file` | — | — | File rename — delegated to arr command API |
 
 ### RenameItem Status Values
 ```
@@ -184,12 +195,14 @@ Single-row configuration table (id always = 1).
 | radarr_url | str | `""` | |
 | radarr_api_key | str | `""` | |
 | radarr_root_folder | str | `/movies` | Path prefix Radarr uses in folder/file paths |
-| radarr_folder_format | str | `{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}` | Renamer template |
+| radarr_folder_format | str | `{Movie CleanTitle} ({Release Year}) {tmdb-{TmdbId}}` | Renamer folder template (read-only in UI, fetched from Radarr) |
+| radarr_file_format | str | `""` | Renamer file template (read-only in UI, fetched from Radarr) |
 | radarr_tags | str | `""` | Comma-separated tag names for tracker |
 | sonarr_url | str | `""` | |
 | sonarr_api_key | str | `""` | |
 | sonarr_root_folder | str | `/tv` | Path prefix Sonarr uses |
-| sonarr_folder_format | str | `{Series TitleYear} {tvdb-{TvdbId}}` | Renamer template |
+| sonarr_folder_format | str | `{Series TitleYear} {tvdb-{TvdbId}}` | Renamer folder template (read-only in UI, fetched from Sonarr) |
+| sonarr_file_format | str | `""` | Renamer file template (read-only in UI, fetched from Sonarr) |
 | sonarr_tags | str | `""` | Comma-separated tag names for tracker |
 | batch_size | int | `20` | Renamer: items per apply batch |
 | poll_interval_minutes | int | `15` | Tracker: scheduler interval |
@@ -240,7 +253,9 @@ One row per folder mismatch (Renamer).
 | current_path | str | Full arr-view path |
 | expected_path | str | Full expected arr-view path |
 | status | str | `pending`, `approved`, `skipped`, `done`, `error` |
-| disk_scenario | str | `rename`, `arr_only`, `collision`, `missing`, `unknown` |
+| disk_scenario | str | `rename`, `arr_only`, `collision`, `missing`, `unknown`, `file` |
+| item_type | str | `folder` (default) or `file` |
+| source_file_id | int\|None | arr file ID — set for `item_type="file"` items |
 | error_message | str\|None | Error detail |
 | created_at | datetime | |
 | updated_at | datetime | |
@@ -382,7 +397,7 @@ Dark nav bar (`#1e293b`), light page body (`#f1f5f9`), white cards. Top nav has 
 | Route | Description |
 |---|---|
 | `/` | Unified dashboard: Tracker stat card + Renamer last-scan card |
-| `/review` | Renamer mismatch table with scenario badges |
+| `/review` | Renamer 4-tab view: Radarr Folders, Radarr Files, Sonarr Folders, Sonarr Files |
 | `/apply` | Renamer SSE live output |
 | `/settings` | Tabbed settings: Librarian \| Tracker \| Notifications |
 | `/logs` | Renamer log output |
@@ -401,6 +416,8 @@ Dark nav bar (`#1e293b`), light page body (`#f1f5f9`), white cards. Top nav has 
 | Fetch all tags | `GET /api/v3/tag` |
 | Update movie path | `PUT /api/v3/movie/{id}?moveFiles=false` |
 | Fetch naming config | `GET /api/v3/config/naming` |
+| Fetch file rename proposals | `GET /api/v3/rename?movieId={id}` |
+| Execute file renames | `POST /api/v3/command {"name":"RenameFiles","movieId":X,"files":[fileId]}` |
 
 ### Sonarr
 | Operation | Endpoint |
@@ -410,6 +427,8 @@ Dark nav bar (`#1e293b`), light page body (`#f1f5f9`), white cards. Top nav has 
 | Fetch all tags | `GET /api/v3/tag` |
 | Update series path | `PUT /api/v3/series/{id}?moveFiles=false` |
 | Fetch naming config | `GET /api/v3/config/naming` |
+| Fetch file rename proposals | `GET /api/v3/rename?seriesId={id}` |
+| Execute file renames | `POST /api/v3/command {"name":"RenameFiles","seriesId":X,"files":[fileId]}` |
 
 - Authentication: `X-Api-Key: <key>` header.
 - Always GET before PUT — never construct a partial body.
