@@ -209,3 +209,30 @@ class TestCommandRenameFiles:
         client = RadarrClient(BASE_URL, API_KEY)
         with pytest.raises(Exception):
             await client.command_rename_files(1, [10])
+
+
+class TestRescanMovie:
+    async def test_sends_correct_body(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/api/v3/command",
+            method="POST",
+            json={"id": 1000},
+        )
+        client = RadarrClient(BASE_URL, API_KEY)
+        await client.rescan_movie(42)
+
+        import json
+        request = httpx_mock.get_requests()[0]
+        body = json.loads(request.content)
+        assert body["name"] == "RescanMovie"
+        assert body["movieId"] == 42
+
+    async def test_non_2xx_raises(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/api/v3/command",
+            method="POST",
+            status_code=500,
+        )
+        client = RadarrClient(BASE_URL, API_KEY)
+        with pytest.raises(Exception):
+            await client.rescan_movie(42)

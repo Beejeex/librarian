@@ -88,6 +88,14 @@ class RadarrClient(BaseArrClient):
         )
         logger.info("Radarr rename command sent for movie %s files %s", movie_id, file_ids)
 
+    async def rescan_movie(self, movie_id: int) -> None:
+        """POST /api/v3/command — tell Radarr to rescan a movie folder and update its file index."""
+        await self.post(
+            "/api/v3/command",
+            {"name": "RescanMovie", "movieId": movie_id},
+        )
+        logger.info("Radarr rescan command sent for movie %s", movie_id)
+
     async def fetch_tags(self) -> list[dict]:
         """Fetch all tags. Returns list of {id, label}."""
         return await self.get("/api/v3/tag")

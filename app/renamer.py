@@ -303,6 +303,18 @@ async def _process_file_item(
         logger.info(
             "File rename command sent for item %s (file_id=%s)", item.id, item.source_file_id
         )
+        # Fire a rescan so arr drops any stale extra-file entries (e.g. orphaned .nfo refs)
+        try:
+            if item.source == "radarr":
+                await client.rescan_movie(item.source_id)
+            else:
+                await client.refresh_series(item.source_id)
+            log_buffer.append(f"  ↳ rescan queued to clean up stale file entries")
+        except Exception as rescan_exc:
+            logger.warning(
+                "Post-rename rescan failed for item %s: %s", item.id, rescan_exc
+            )
+            log_buffer.append(f"  ↳ rescan failed (non-fatal): {rescan_exc}")
     except Exception as exc:
         _mark_error(item, f"Arr rename command failed: {exc}", session)
         log_buffer.append(f"  ↳ arr rename command FAILED: {exc}")

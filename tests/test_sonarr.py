@@ -207,3 +207,30 @@ class TestCommandRenameFiles:
         client = SonarrClient(BASE_URL, API_KEY)
         with pytest.raises(Exception):
             await client.command_rename_files(1, [5])
+
+
+class TestRefreshSeries:
+    async def test_sends_correct_body(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/api/v3/command",
+            method="POST",
+            json={"id": 1000},
+        )
+        client = SonarrClient(BASE_URL, API_KEY)
+        await client.refresh_series(7)
+
+        import json
+        request = httpx_mock.get_requests()[0]
+        body = json.loads(request.content)
+        assert body["name"] == "RefreshSeries"
+        assert body["seriesId"] == 7
+
+    async def test_non_2xx_raises(self, httpx_mock: HTTPXMock):
+        httpx_mock.add_response(
+            url=f"{BASE_URL}/api/v3/command",
+            method="POST",
+            status_code=500,
+        )
+        client = SonarrClient(BASE_URL, API_KEY)
+        with pytest.raises(Exception):
+            await client.refresh_series(7)

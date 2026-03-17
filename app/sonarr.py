@@ -90,6 +90,14 @@ class SonarrClient(BaseArrClient):
         )
         logger.info("Sonarr rename command sent for series %s files %s", series_id, file_ids)
 
+    async def refresh_series(self, series_id: int) -> None:
+        """POST /api/v3/command — tell Sonarr to refresh a series and update its file index."""
+        await self.post(
+            "/api/v3/command",
+            {"name": "RefreshSeries", "seriesId": series_id},
+        )
+        logger.info("Sonarr refresh command sent for series %s", series_id)
+
     async def fetch_tags(self) -> list[dict]:
         """Fetch all tags. Returns list of {id, label}."""
         return await self.get("/api/v3/tag")
