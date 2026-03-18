@@ -62,6 +62,8 @@ def _run_migrations() -> None:
         # Collect Info: store file formats in DB (added v0.2.0)
         ("appconfig", "radarr_file_format", "VARCHAR NOT NULL DEFAULT ''"),
         ("appconfig", "sonarr_file_format", "VARCHAR NOT NULL DEFAULT ''"),
+        # Renamer: optional file rename scan (added v0.2.x)
+        ("appconfig", "scan_file_renames", "BOOLEAN NOT NULL DEFAULT 1"),
     ]
     with engine.connect() as conn:
         for table, column, definition in new_columns:
