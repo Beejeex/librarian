@@ -7,7 +7,17 @@
   <a href="/tracker" class="btn btn-ghost">← Dashboard</a>
 </div>
 
-<div class="card" x-data="{ filter: 'all', search: '' }">
+<div class="card" x-data="{
+  filter: 'all',
+  search: '',
+  sort: 'updated',
+  dir: 'desc',
+  setSort(col) {
+    if (this.sort === col) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
+    else { this.sort = col; this.dir = 'asc'; }
+    this.$dispatch('sort-changed');
+  }
+}">
 
   <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
     <input type="search"
@@ -32,18 +42,19 @@
   <table>
     <thead>
       <tr>
-        <th>Title</th>
-        <th>Type</th>
-        <th>Source</th>
+        <th><button @click="setSort('title')" class="sort-btn">Title <span x-show="sort==='title'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+        <th><button @click="setSort('type')" class="sort-btn">Type <span x-show="sort==='type'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+        <th><button @click="setSort('source')" class="sort-btn">Source <span x-show="sort==='source'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
         <th>Tag(s)</th>
-        <th>Status</th>
-        <th>Size</th>
-        <th>Updated</th>
+        <th><button @click="setSort('status')" class="sort-btn">Status <span x-show="sort==='status'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+        <th><button @click="setSort('size')" class="sort-btn">Size <span x-show="sort==='size'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+        <th><button @click="setSort('updated')" class="sort-btn">Updated <span x-show="sort==='updated'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
         <th></th>
       </tr>
     </thead>
     <tbody hx-get="/tracker/items/rows-fragment"
-           hx-trigger="every 5s"
+           hx-trigger="every 5s, sort-changed"
+           :hx-vals="JSON.stringify({sort, dir})"
            hx-swap="innerHTML">
       {% include "_tracker_items_rows.html" %}
     </tbody>

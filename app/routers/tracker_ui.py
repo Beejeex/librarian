@@ -34,6 +34,24 @@ from app.database import get_session
 from app.models import AppConfig, TrackedItem
 from app.scheduler import is_poll_running, reschedule_poll, run_poll
 
+# ---------------------------------------------------------------------------
+# Sort helpers
+# ---------------------------------------------------------------------------
+
+_SORT_COLS = {
+    "title":   TrackedItem.title,
+    "type":    TrackedItem.media_type,
+    "source":  TrackedItem.source,
+    "status":  TrackedItem.status,
+    "size":    TrackedItem.file_size_bytes,
+    "updated": TrackedItem.updated_at,
+}
+
+
+def _order_by(sort: str, dir: str):
+    col = _SORT_COLS.get(sort, TrackedItem.updated_at)
+    return col.desc() if dir != "asc" else col.asc()
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tracker")
@@ -205,14 +223,15 @@ async def stats_fragment(request: Request):
 
 
 @router.get("/dashboard/recent-fragment", response_class=HTMLResponse)
-async def recent_fragment(request: Request):
+async def recent_fragment(request: Request, sort: str = "updated", dir: str = "desc"):
     """Return the recent-activity table content for HTMX live-refresh."""
     with get_session() as session:
-        all_items = session.exec(select(TrackedItem)).all()
-    recent = sorted(all_items, key=lambda i: i.updated_at, reverse=True)[:10]
+        recent = session.exec(
+            select(TrackedItem).order_by(_order_by(sort, dir)).limit(20)
+        ).all()
     return templates.TemplateResponse(
         "_tracker_recent_fragment.html",
-        {"request": request, "recent": recent},
+        {"request": request, "recent": recent, "sort": sort, "dir": dir},
     )
 
 
@@ -230,11 +249,11 @@ async def poll_indicator(request: Request):
 
 
 @router.get("/items/rows-fragment", response_class=HTMLResponse)
-async def items_rows_fragment(request: Request):
+async def items_rows_fragment(request: Request, sort: str = "updated", dir: str = "desc"):
     """Return only the <tr> rows for the items table for HTMX tbody refresh."""
     with get_session() as session:
         all_items = session.exec(
-            select(TrackedItem).order_by(TrackedItem.updated_at.desc())
+            select(TrackedItem).order_by(_order_by(sort, dir))
         ).all()
     return templates.TemplateResponse(
         "_tracker_items_rows.html",

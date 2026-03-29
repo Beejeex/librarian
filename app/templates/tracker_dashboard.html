@@ -5,12 +5,50 @@
 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
   <h1 style="margin:0">🗂 Tracker</h1>
   <div style="display:flex;gap:.75rem;align-items:center">
+    <div x-data="pollCountdown()" x-init="init()"
+         style="font-size:.82rem;color:#64748b;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:6px;padding:4px 12px;white-space:nowrap;">
+      <span x-show="secs === null">Next poll: —</span>
+      <span x-show="secs !== null && secs > 0">Next poll: <strong x-text="fmt()"></strong></span>
+      <span x-show="secs !== null && secs <= 0" style="color:#7c3aed;">Polling…</span>
+    </div>
     <a href="/tracker/items" class="btn btn-ghost">All Items</a>
     <form method="post" action="/tracker/poll" style="margin:0">
       <button type="submit" class="btn btn-primary">Poll Now</button>
     </form>
   </div>
 </div>
+
+<script>
+function pollCountdown() {
+  return {
+    secs: null,
+    _timer: null,
+    async init() {
+      await this.refresh();
+      this._timer = setInterval(() => {
+        if (this.secs === null) return;
+        this.secs -= 1;
+        if (this.secs <= 0) { this.secs = 0; setTimeout(() => this.refresh(), 3000); }
+      }, 1000);
+    },
+    async refresh() {
+      try {
+        const r = await fetch('/api/tracker/next-poll');
+        const d = await r.json();
+        if (d.next_poll) {
+          this.secs = Math.round((new Date(d.next_poll) - Date.now()) / 1000);
+        }
+      } catch (_) {}
+    },
+    fmt() {
+      if (this.secs === null || this.secs <= 0) return '';
+      const m = Math.floor(this.secs / 60);
+      const s = this.secs % 60;
+      return m > 0 ? `${m}m ${String(s).padStart(2,'0')}s` : `${s}s`;
+    }
+  };
+}
+</script>
 
 {# ── First-run banners ─────────────────────────────────────────────────── #}
 {% if config.radarr_tags and not config.radarr_first_run_complete %}
@@ -95,10 +133,20 @@
 </div>
 
 {# ── Recent activity ─────────────────────────────────────────────────────── #}
-<div class="card"
-     hx-get="/tracker/dashboard/recent-fragment"
-     hx-trigger="every 5s"
-     hx-swap="innerHTML">
-  {% include "_tracker_recent_fragment.html" %}
+<div class="card" x-data="{
+  sort: 'updated',
+  dir: 'desc',
+  setSort(col) {
+    if (this.sort === col) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
+    else { this.sort = col; this.dir = 'asc'; }
+    this.$dispatch('sort-changed');
+  }
+}">
+  <div hx-get="/tracker/dashboard/recent-fragment"
+       hx-trigger="every 5s, sort-changed"
+       :hx-vals="JSON.stringify({sort, dir})"
+       hx-swap="innerHTML">
+    {% include "_tracker_recent_fragment.html" %}
+  </div>
 </div>
 {% endblock %}

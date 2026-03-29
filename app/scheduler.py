@@ -49,6 +49,14 @@ def is_poll_running() -> bool:
     return _poll_lock.locked()
 
 
+def get_next_poll_time() -> datetime | None:
+    """Return the next scheduled poll run time (UTC), or None if scheduler is not running."""
+    if not _scheduler.running:
+        return None
+    job = _scheduler.get_job("poll_job")
+    return job.next_run_time if job else None
+
+
 def _remap_media_path(file_path: str, root_folder: str, subfolder: str) -> str:
     """
     Translate an absolute path from Radarr/Sonarr into its container equivalent.
@@ -163,9 +171,12 @@ async def run_poll() -> None:
                 and bool(config.sonarr_tags.strip())
             )
 
-            await _poll_radarr(config, semaphore, radarr_first_run)
-            await _poll_sonarr(config, semaphore, sonarr_first_run)
+            await _poll_radarr(config, semaphore, radarr_first_run, copy_enabled=False)
+            await _poll_sonarr(config, semaphore, sonarr_first_run, copy_enabled=False)
 
+            # Copy phase — non-backlog items first so new arrivals have priority
+            if not (radarr_first_run or sonarr_first_run):
+                await _copy_pending_items(config, semaphore)
             # Flip per-source flags after their index-only run
             config_changed = False
             if radarr_first_run:
@@ -203,6 +214,7 @@ async def _poll_radarr(
     config: AppConfig,
     semaphore: asyncio.Semaphore,
     is_first_run: bool = False,
+    copy_enabled: bool = True,
 ) -> None:
     """Fetch movies tagged with any configured Radarr tag and process each."""
     if not config.radarr_url or not config.radarr_api_key:
@@ -246,6 +258,7 @@ async def _poll_radarr(
                 config=config,
                 semaphore=semaphore,
                 is_first_run=is_first_run,
+                copy_enabled=copy_enabled,
                 source="radarr",
                 media_type="movie",
                 source_id=movie.movie_file_id,
@@ -263,6 +276,7 @@ async def _poll_sonarr(
     config: AppConfig,
     semaphore: asyncio.Semaphore,
     is_first_run: bool = False,
+    copy_enabled: bool = True,
 ) -> None:
     """Fetch episode files for series tagged with any configured Sonarr tag and process each."""
     if not config.sonarr_url or not config.sonarr_api_key:
@@ -306,6 +320,7 @@ async def _poll_sonarr(
                 config=config,
                 semaphore=semaphore,
                 is_first_run=is_first_run,
+                copy_enabled=copy_enabled,
                 source="sonarr",
                 media_type="episode",
                 source_id=ef.episode_file_id,
@@ -332,6 +347,7 @@ async def _process_item(
     config: AppConfig,
     semaphore: asyncio.Semaphore,
     is_first_run: bool = False,
+    copy_enabled: bool = True,
     source: str,
     media_type: str,
     source_id: int,
@@ -354,6 +370,8 @@ async def _process_item(
     Normal mode (is_first_run=False):
       - require_approval=True  → item lands as 'queued'; user must approve.
       - require_approval=False → item lands as 'pending' and is copied this poll.
+
+    copy_enabled=False: upsert only — copying is deferred to _copy_pending_items.
 
     Items already in the DB:
       - finished or copied → skip (never re-copy).
@@ -447,6 +465,9 @@ async def _process_item(
                 logger.info("Queued [%s]: %s", source, title)
                 return
 
+    if not copy_enabled:
+        return
+
     # --- Quota gate ---
     # src_size already read above; reuse it to project post-copy usage.
     with get_session() as session:
@@ -483,6 +504,65 @@ async def _process_item(
         _update_item_status(item.id, "error", error_message=str(exc))
         logger.error("Failed to copy [%s] %s: %s", source, title, exc)
         await notify_error(config, title, source, str(exc))
+
+
+async def _copy_pending_items(config: AppConfig, semaphore: asyncio.Semaphore) -> None:
+    """
+    Copy all pending items in priority order: non-backlog first, then backlog.
+
+    Run two sequential gather batches so that new arrivals always start copying
+    before backlog items, regardless of when they were first seen.
+    """
+    with get_session() as session:
+        items = session.exec(
+            select(TrackedItem)
+            .where(TrackedItem.status == "pending")
+            .order_by(TrackedItem.is_backlog.asc(), TrackedItem.created_at.asc())
+        ).all()
+
+    non_backlog = [i for i in items if not i.is_backlog]
+    backlog     = [i for i in items if i.is_backlog]
+
+    if non_backlog:
+        await asyncio.gather(*[_copy_item(config, semaphore, item) for item in non_backlog])
+    if backlog:
+        await asyncio.gather(*[_copy_item(config, semaphore, item) for item in backlog])
+
+
+async def _copy_item(config: AppConfig, semaphore: asyncio.Semaphore, item: TrackedItem) -> None:
+    """Run quota check + file copy for a single pending TrackedItem."""
+    src_size = item.file_size_bytes or 0
+
+    with get_session() as session:
+        db_item = session.get(TrackedItem, item.id)
+        if db_item is None or db_item.status != "pending":
+            return
+        if not check_quota(session, config, db_item.is_backlog, prospective_bytes=src_size):
+            pool_label = "backlog" if db_item.is_backlog else "new"
+            logger.info(
+                "Quota full for %s pool — leaving '%s' as pending (will retry).",
+                pool_label, item.title,
+            )
+            return
+
+    try:
+        async with semaphore:
+            _update_item_status(item.id, "copying", file_size_bytes=src_size)
+            await copy_file(
+                item.file_path,
+                item.share_path,
+                mode=config.copy_mode,
+                item_id=item.id,
+                title=item.title,
+            )
+        file_size = await asyncio.to_thread(get_file_size, item.share_path)
+        _update_item_status(item.id, "copied", file_size_bytes=file_size)
+        logger.info("Copied [%s]: %s", item.source, item.title)
+        await notify_copied(config, item.title, item.source)
+    except Exception as exc:
+        _update_item_status(item.id, "error", error_message=str(exc))
+        logger.error("Failed to copy [%s] %s: %s", item.source, item.title, exc)
+        await notify_error(config, item.title, item.source, str(exc))
 
 
 def _count_new_backlog(source: str) -> int:

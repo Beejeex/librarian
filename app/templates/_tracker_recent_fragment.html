@@ -2,12 +2,12 @@
 <table class="table" style="margin:0;">
   <thead>
     <tr>
-      <th>Title</th>
-      <th>Type</th>
-      <th>Source</th>
-      <th>Status</th>
-      <th>Size</th>
-      <th>Updated</th>
+      <th><button @click="setSort('title')" class="sort-btn">Title <span x-show="sort==='title'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+      <th><button @click="setSort('type')" class="sort-btn">Type <span x-show="sort==='type'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+      <th><button @click="setSort('source')" class="sort-btn">Source <span x-show="sort==='source'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+      <th><button @click="setSort('status')" class="sort-btn">Status <span x-show="sort==='status'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+      <th><button @click="setSort('size')" class="sort-btn">Size <span x-show="sort==='size'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+      <th><button @click="setSort('updated')" class="sort-btn">Updated <span x-show="sort==='updated'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
       <th>Action</th>
     </tr>
   </thead>

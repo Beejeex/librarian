@@ -17,6 +17,7 @@ Provides:
   GET  /api/tracker/radarr/tags         — HTML <select> fragment of Radarr tags
   GET  /api/tracker/sonarr/tags         — HTML <select> fragment of Sonarr tags
   GET  /api/tracker/reset-first-run     — reset radarr/sonarr first-run flag, redirect to settings
+  GET  /api/tracker/next-poll           — next scheduled poll time (UTC ISO)
 """
 
 import asyncio
@@ -38,7 +39,7 @@ from app.log_buffer import (
     unsubscribe_tracker_log_queue,
 )
 from app.models import AppConfig, TrackedItem
-from app.scheduler import run_poll
+from app.scheduler import run_poll, get_next_poll_time
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,13 @@ async def trigger_poll():
     logger.info("Manual poll triggered via Tracker API.")
     asyncio.create_task(run_poll())
     return {"status": "poll triggered"}
+
+
+@router.get("/next-poll")
+def next_poll():
+    """Return the next scheduled poll run time as a UTC ISO 8601 string."""
+    t = get_next_poll_time()
+    return {"next_poll": t.isoformat() if t else None}
 
 
 # ---------------------------------------------------------------------------
