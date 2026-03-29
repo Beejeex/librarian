@@ -284,9 +284,10 @@ async def share_stats_html():
             <div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem">{total['file_count']} files</div>
         </div>
     </div>
-    <p style="color:#94a3b8;font-size:.8rem;margin-top:.5rem">
-        {fs_stats['file_count']} files &middot; {fs_stats['size_gb']} GB on share
-    </p>
+    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:.6rem;font-size:.8rem;color:#94a3b8">
+        <span>{fs_stats['file_count']} files &middot; {fs_stats['size_gb']} GB on share</span>
+        {f'<span style="color:#16a34a;font-weight:600">{fs_stats["disk_free_gb"]} GB free on disk</span>' if fs_stats.get('disk_free_gb') is not None else ''}
+    </div>
     """
 
 

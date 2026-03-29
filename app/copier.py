@@ -267,7 +267,8 @@ def get_share_stats(share_path: str) -> dict:
     """
     Walk the share directory and return total file count and cumulative size.
 
-    Returns a dict with keys: size_bytes (int), size_gb (float), file_count (int).
+    Returns a dict with keys: size_bytes (int), size_gb (float), file_count (int),
+    disk_free_bytes (int | None), disk_free_gb (float | None).
     """
     total_size = 0
     file_count = 0
@@ -278,8 +279,14 @@ def get_share_stats(share_path: str) -> dict:
                 file_count += 1
             except OSError:
                 pass
+    try:
+        free = shutil.disk_usage(share_path).free
+    except Exception:
+        free = None
     return {
         "size_bytes": total_size,
         "size_gb": round(total_size / (1024 ** 3), 3),
         "file_count": file_count,
+        "disk_free_bytes": free,
+        "disk_free_gb": round(free / (1024 ** 3), 2) if free is not None else None,
     }
