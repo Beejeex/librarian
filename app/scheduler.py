@@ -397,21 +397,30 @@ async def _process_item(
                 logger.debug("Skipping copied item: %s", title)
                 return
             if existing.status == "finished":
-                # Detect upgrade: file was deleted from share and source has a new version
-                if existing.file_path != file_path:
+                # Reset if source file changed (upgrade) or share_path is stale
+                # (e.g. path-building logic was corrected in a newer release).
+                path_changed = existing.file_path != file_path
+                share_stale = existing.share_path != share_path
+                if path_changed or share_stale:
                     existing.file_path = file_path
                     existing.share_path = share_path
                     existing.file_size_bytes = src_size
-                    existing.is_upgraded = True
+                    existing.is_upgraded = path_changed  # only a true upgrade if source changed
                     existing.status = "pending"
                     existing.error_message = None
                     existing.updated_at = datetime.now(timezone.utc)
                     session.add(existing)
                     session.commit()
-                    logger.info(
-                        "Upgrade detected [%s]: '%s' — file path changed, resetting to pending.",
-                        source, title,
-                    )
+                    if path_changed:
+                        logger.info(
+                            "Upgrade detected [%s]: '%s' — file path changed, resetting to pending.",
+                            source, title,
+                        )
+                    else:
+                        logger.info(
+                            "Share path corrected [%s]: '%s' — resetting to pending for re-copy.",
+                            source, title,
+                        )
                     item = existing
                 else:
                     logger.debug("Skipping finished item: %s", title)

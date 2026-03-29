@@ -60,6 +60,9 @@ router = APIRouter(prefix="/tracker")
 _templates_dir = os.path.join(os.path.dirname(__file__), "../templates")
 templates = Jinja2Templates(directory=_templates_dir)
 
+from app.version import VERSION
+templates.env.globals["VERSION"] = VERSION
+
 
 def _filesize_filter(size_bytes) -> str:
     """Jinja2 filter: format a byte count as a human-readable size string."""

@@ -13,12 +13,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import load_config
+from app.version import VERSION
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 _templates_dir = os.path.join(os.path.dirname(__file__), "../templates")
 templates = Jinja2Templates(directory=_templates_dir)
+templates.env.globals["VERSION"] = VERSION
 
 
 @router.get("/tags", response_class=HTMLResponse)
