@@ -11,6 +11,10 @@
 <div class="card" style="padding:1rem 1.5rem;margin-bottom:1.25rem;">
   <div style="display:flex;gap:2.5rem;flex-wrap:wrap;align-items:center;">
     <div>
+      <div style="color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Folders</div>
+      <div style="font-size:1.25rem;font-weight:700">{{ folders | length }}</div>
+    </div>
+    <div>
       <div style="color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Files</div>
       <div style="font-size:1.25rem;font-weight:700">{{ file_count }}</div>
     </div>
@@ -21,7 +25,7 @@
     {% if disk %}
     <div>
       <div style="color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Free on disk</div>
-      <div style="font-size:1.25rem;font-weight:700">{{ disk.free | filesize }}</div>
+      <div style="font-size:1.25rem;font-weight:700;color:#16a34a;">{{ disk.free | filesize }}</div>
     </div>
     {% endif %}
     <div style="margin-left:auto;color:#94a3b8;font-size:.78rem;font-family:monospace">{{ share_path }}</div>
@@ -29,66 +33,131 @@
 </div>
 
 {# ── File table ──────────────────────────────────────────────────────────── #}
-{% if entries %}
+{% if folders or root_files %}
 <div class="card" style="padding:0;overflow:hidden;">
   <table>
     <thead>
       <tr>
-        <th>Folder</th>
-        <th>File</th>
+        <th style="width:55%">Name / Path</th>
         <th>Size</th>
+        <th>Files</th>
         <th style="text-align:right">Actions</th>
       </tr>
     </thead>
-    <tbody>
-      {% for folder, files in entries | groupby("top_dir") %}
-      {% if folder %}
-      <tr>
-        <td colspan="4"
-            style="background:#f8fafc;color:#475569;font-weight:600;font-size:.8rem;padding:6px 12px;border-bottom:1px solid #e2e8f0;">
-          📁 {{ folder }}
+
+    {# ── One <tbody> per folder so HTMX can swap out the whole group ── #}
+    {% for folder in folders %}
+    <tbody id="folder-{{ loop.index }}">
+      {# Folder header row #}
+      <tr style="background:#f1f5f9;">
+        <td colspan="2" style="padding:8px 12px;font-weight:700;font-size:.9rem;color:#1e293b;">
+          <span style="font-size:1rem;margin-right:.4rem;">📁</span>{{ folder.name }}
+        </td>
+        <td style="white-space:nowrap;color:#64748b;font-size:.85rem;">
+          {{ folder.size_bytes | filesize }}
+        </td>
+        <td style="white-space:nowrap;font-size:.8rem;color:#94a3b8;text-align:right;padding-right:.75rem;">
+          {{ folder.file_count }} file{% if folder.file_count != 1 %}s{% endif %}
         </td>
       </tr>
-      {% endif %}
-      {% for entry in files %}
-      <tr>
-        <td style="color:#94a3b8;font-size:.8rem;width:1%;white-space:nowrap;padding-left:1.75rem;">
-          {% if not folder %}📄{% endif %}
+      {# Delete-folder confirm row #}
+      <tr style="background:#fef2f2;" x-data="{confirm: false}">
+        <td colspan="4" style="padding:4px 12px;border-bottom:2px solid #e2e8f0;">
+          <div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end;">
+            <template x-if="!confirm">
+              <button class="btn btn-danger"
+                      style="padding:3px 12px;font-size:.78rem;"
+                      @click="confirm=true">🗑 Delete folder</button>
+            </template>
+            <template x-if="confirm">
+              <span style="display:inline-flex;align-items:center;gap:.5rem;">
+                <span style="font-size:.82rem;color:#7f1d1d;font-weight:600;">Delete <strong>{{ folder.name }}</strong> and all its files?</span>
+                <button class="btn btn-ghost" style="padding:3px 10px;font-size:.78rem;" @click="confirm=false">Cancel</button>
+                <form method="post" action="/tracker/share/delete-folder" style="display:inline;"
+                      hx-post="/tracker/share/delete-folder"
+                      hx-target="#folder-{{ loop.index }}"
+                      hx-swap="outerHTML">
+                  <input type="hidden" name="folder_name" value="{{ folder.name }}">
+                  <button type="submit" class="btn btn-danger" style="padding:3px 12px;font-size:.78rem;">Yes, delete</button>
+                </form>
+              </span>
+            </template>
+          </div>
         </td>
-        <td style="max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-            title="{{ entry.rel_path }}">
+      </tr>
+      {# File rows #}
+      {% for entry in folder.files %}
+      <tr>
+        <td style="padding-left:2rem;max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#475569;font-size:.85rem;"
+            title="{{ entry.name }}">
           {{ entry.name }}
         </td>
-        <td style="white-space:nowrap;color:#64748b;">{{ entry.size_bytes | filesize }}</td>
+        <td style="white-space:nowrap;color:#64748b;font-size:.85rem;">{{ entry.size_bytes | filesize }}</td>
+        <td></td>
         <td style="text-align:right;white-space:nowrap;" x-data="{confirm: false}">
           <template x-if="!confirm">
-            <button class="btn btn-danger"
-                    style="padding:3px 10px;font-size:.78rem;"
+            <button class="btn btn-ghost"
+                    style="padding:2px 8px;font-size:.75rem;color:#dc2626;border-color:#fecaca;"
                     @click="confirm=true">Delete</button>
           </template>
           <template x-if="confirm">
-            <span style="display:inline-flex;align-items:center;gap:.4rem;">
-              <span style="font-size:.78rem;color:#64748b;">Sure?</span>
-              <button class="btn btn-ghost"
-                      style="padding:3px 10px;font-size:.78rem;"
-                      @click.stop="confirm=false">No</button>
-              <form method="post" action="/tracker/share/delete"
-                    style="display:inline;"
+            <span style="display:inline-flex;align-items:center;gap:.35rem;">
+              <span style="font-size:.75rem;color:#64748b;">Sure?</span>
+              <button class="btn btn-ghost" style="padding:2px 8px;font-size:.75rem;" @click="confirm=false">No</button>
+              <form method="post" action="/tracker/share/delete" style="display:inline;"
                     hx-post="/tracker/share/delete"
                     hx-target="closest tr"
                     hx-swap="outerHTML">
                 <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
-                <button type="submit"
-                        class="btn btn-danger"
-                        style="padding:3px 10px;font-size:.78rem;">Yes</button>
+                <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:.75rem;">Yes</button>
               </form>
             </span>
           </template>
         </td>
       </tr>
       {% endfor %}
+    </tbody>
+    {% endfor %}
+
+    {# ── Root-level files (not inside any subfolder) ── #}
+    {% if root_files %}
+    <tbody>
+      <tr style="background:#f8fafc;">
+        <td colspan="4" style="padding:8px 12px;font-weight:600;font-size:.8rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;">
+          Root files
+        </td>
+      </tr>
+      {% for entry in root_files %}
+      <tr>
+        <td style="max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            title="{{ entry.name }}">📄 {{ entry.name }}</td>
+        <td style="white-space:nowrap;color:#64748b;">{{ entry.size_bytes | filesize }}</td>
+        <td></td>
+        <td style="text-align:right;white-space:nowrap;" x-data="{confirm: false}">
+          <template x-if="!confirm">
+            <button class="btn btn-ghost"
+                    style="padding:2px 8px;font-size:.75rem;color:#dc2626;border-color:#fecaca;"
+                    @click="confirm=true">Delete</button>
+          </template>
+          <template x-if="confirm">
+            <span style="display:inline-flex;align-items:center;gap:.35rem;">
+              <span style="font-size:.75rem;color:#64748b;">Sure?</span>
+              <button class="btn btn-ghost" style="padding:2px 8px;font-size:.75rem;" @click="confirm=false">No</button>
+              <form method="post" action="/tracker/share/delete" style="display:inline;"
+                    hx-post="/tracker/share/delete"
+                    hx-target="closest tr"
+                    hx-swap="outerHTML">
+                <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
+                <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:.75rem;">Yes</button>
+              </form>
+            </span>
+          </template>
+        </td>
+      </tr>
       {% endfor %}
     </tbody>
+    {% endif %}
+
   </table>
 </div>
 {% else %}

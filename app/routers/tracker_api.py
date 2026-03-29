@@ -267,6 +267,15 @@ async def share_stats_html():
         else f"{total['size_gb']} GB (unlimited)"
     )
 
+    b_free = round(b_limit - backlog["size_gb"], 3) if b_limit > 0 else None
+    t_free = round(t_limit - total["size_gb"], 3) if t_limit > 0 else None
+
+    def free_html(free_gb: float | None, color: str) -> str:
+        if free_gb is None:
+            return '<span style="color:#94a3b8">unlimited</span>'
+        clr = "#16a34a" if free_gb > 0 else "#dc2626"
+        return f'<span style="color:{clr};font-weight:600">{free_gb} GB free</span>'
+
     return f"""
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
         <div>
@@ -274,19 +283,24 @@ async def share_stats_html():
             <div style="background:#e2e8f0;border-radius:999px;height:8px;overflow:hidden">
                 <div style="background:#f59e0b;height:100%;width:{b_pct}%;transition:width .3s"></div>
             </div>
-            <div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem">{backlog['file_count']} files</div>
+            <div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem;display:flex;gap:.75rem">
+                <span>{backlog['file_count']} files</span>
+                {free_html(b_free, '#f59e0b')}
+            </div>
         </div>
         <div>
             <div style="font-size:.8rem;color:#64748b;margin-bottom:.25rem">Total &mdash; {t_label}</div>
             <div style="background:#e2e8f0;border-radius:999px;height:8px;overflow:hidden">
                 <div style="background:#0284c7;height:100%;width:{t_pct}%;transition:width .3s"></div>
             </div>
-            <div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem">{total['file_count']} files</div>
+            <div style="font-size:.75rem;color:#94a3b8;margin-top:.2rem;display:flex;gap:.75rem">
+                <span>{total['file_count']} files</span>
+                {free_html(t_free, '#0284c7')}
+            </div>
         </div>
     </div>
-    <div style="display:flex;gap:1.5rem;flex-wrap:wrap;margin-top:.6rem;font-size:.8rem;color:#94a3b8">
-        <span>{fs_stats['file_count']} files &middot; {fs_stats['size_gb']} GB on share</span>
-        {f'<span style="color:#16a34a;font-weight:600">{fs_stats["disk_free_gb"]} GB free on disk</span>' if fs_stats.get('disk_free_gb') is not None else ''}
+    <div style="font-size:.8rem;color:#94a3b8;margin-top:.6rem">
+        {fs_stats['file_count']} files &middot; {fs_stats['size_gb']} GB on share
     </div>
     """
 

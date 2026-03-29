@@ -259,20 +259,44 @@ async def share_browser(request: Request):
     """Render the share directory browser."""
     config = load_config()
     share_root = Path(config.share_path).resolve()
-    entries: list[dict] = []
+    folders: list[dict] = []   # [{name, size_bytes, file_count, files: [...]}]
+    root_files: list[dict] = []
     total_size = 0
+    total_files = 0
     if share_root.exists():
-        for f in sorted(share_root.rglob("*")):
-            if f.is_file():
-                rel = f.relative_to(share_root)
-                sz = f.stat().st_size
+        # Group immediate children: subdirectories get their own bucket, root files go flat
+        dir_buckets: dict[str, dict] = {}
+        for item in sorted(share_root.iterdir(), key=lambda p: (p.is_file(), p.name.lower())):
+            if item.is_dir():
+                bucket: dict = {"name": item.name, "size_bytes": 0, "file_count": 0, "files": []}
+                for f in sorted(item.rglob("*"), key=lambda p: p.name.lower()):
+                    if f.is_file():
+                        try:
+                            sz = f.stat().st_size
+                        except OSError:
+                            continue
+                        rel = f.relative_to(share_root)
+                        bucket["size_bytes"] += sz
+                        bucket["file_count"] += 1
+                        total_size += sz
+                        total_files += 1
+                        bucket["files"].append({
+                            "rel_path": rel.as_posix(),
+                            "name": rel.as_posix()[len(item.name) + 1:],  # path under folder
+                            "size_bytes": sz,
+                        })
+                folders.append(bucket)
+            elif item.is_file():
+                try:
+                    sz = item.stat().st_size
+                except OSError:
+                    continue
                 total_size += sz
-                top_dir = rel.parts[0] if len(rel.parts) > 1 else ""
-                entries.append({
-                    "rel_path": rel.as_posix(),
+                total_files += 1
+                root_files.append({
+                    "rel_path": item.name,
+                    "name": item.name,
                     "size_bytes": sz,
-                    "top_dir": top_dir,
-                    "name": f.name,
                 })
     try:
         du = shutil.disk_usage(share_root)
@@ -283,42 +307,42 @@ async def share_browser(request: Request):
         "tracker_share.html",
         {
             "request": request,
-            "entries": entries,
+            "folders": folders,
+            "root_files": root_files,
             "total_size": total_size,
-            "file_count": len(entries),
+            "file_count": total_files,
             "disk": disk,
             "share_path": str(share_root),
         },
     )
 
 
-@router.post("/share/delete", response_class=HTMLResponse)
-async def delete_share_file(rel_path: str = Form(...)):
-    """Delete a single file from the share directory."""
+@router.post("/share/delete-folder", response_class=HTMLResponse)
+async def delete_share_folder(folder_name: str = Form(...)):
+    """Delete an entire top-level subfolder from the share directory."""
+    # Reject any path separators — must be a plain directory name
+    if "/" in folder_name or "\\" in folder_name or folder_name in ("", ".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid folder name.")
     config = load_config()
     share_root = Path(config.share_path).resolve()
     try:
-        target = (share_root / rel_path).resolve()
-        target.relative_to(share_root)  # raises ValueError if outside share_root
+        target = (share_root / folder_name).resolve()
+        target.relative_to(share_root)  # path-traversal guard
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid path.")
+    # Must be a direct child (depth 1), not share_root itself
+    if target.parent != share_root or target == share_root:
+        raise HTTPException(status_code=400, detail="Not a direct subfolder.")
     try:
-        if target.is_file():
-            target.unlink()
-            # Clean up empty parent directories up to (but not including) share_root
-            parent = target.parent
-            while parent != share_root:
-                if parent.exists() and not any(parent.iterdir()):
-                    parent.rmdir()
-                    parent = parent.parent
-                else:
-                    break
+        if target.exists():
+            shutil.rmtree(target)
+        logger.info("Deleted share folder: %s", target)
         return HTMLResponse("")
     except Exception as exc:
-        logger.error("Failed to delete share file %s: %s", rel_path, exc)
+        logger.error("Failed to delete share folder %s: %s", folder_name, exc)
         return HTMLResponse(
-            f'<tr><td colspan="4" style="color:#dc2626;padding:8px 12px">'
-            f"Error deleting {rel_path}: {exc}</td></tr>"
+            f'<tbody><tr><td colspan="4" style="color:#dc2626;padding:8px 12px">'
+            f"Error deleting {folder_name}: {exc}</td></tr></tbody>"
         )
 
 
