@@ -64,24 +64,22 @@
       <tr style="background:#fef2f2;" x-data="{confirm: false}">
         <td colspan="4" style="padding:4px 12px;border-bottom:2px solid #e2e8f0;">
           <div style="display:flex;align-items:center;gap:.5rem;justify-content:flex-end;">
-            <template x-if="!confirm">
-              <button class="btn btn-danger"
-                      style="padding:3px 12px;font-size:.78rem;"
-                      @click="confirm=true">🗑 Delete folder</button>
-            </template>
-            <template x-if="confirm">
-              <span style="display:inline-flex;align-items:center;gap:.5rem;">
-                <span style="font-size:.82rem;color:#7f1d1d;font-weight:600;">Delete <strong>{{ folder.name }}</strong> and all its files?</span>
-                <button class="btn btn-ghost" style="padding:3px 10px;font-size:.78rem;" @click="confirm=false">Cancel</button>
-                <form method="post" action="/tracker/share/delete-folder" style="display:inline;"
-                      hx-post="/tracker/share/delete-folder"
-                      hx-target="#folder-{{ loop.index }}"
-                      hx-swap="outerHTML">
-                  <input type="hidden" name="folder_name" value="{{ folder.name }}">
-                  <button type="submit" class="btn btn-danger" style="padding:3px 12px;font-size:.78rem;">Yes, delete</button>
-                </form>
-              </span>
-            </template>
+            <button class="btn btn-danger"
+                    style="padding:3px 12px;font-size:.78rem;"
+                    x-show="!confirm"
+                    @click="confirm=true">🗑 Delete folder</button>
+            <span style="display:inline-flex;align-items:center;gap:.5rem;"
+                  x-show="confirm">
+              <span style="font-size:.82rem;color:#7f1d1d;font-weight:600;">Delete <strong>{{ folder.name }}</strong> and all its files?</span>
+              <button class="btn btn-ghost" style="padding:3px 10px;font-size:.78rem;" @click="confirm=false">Cancel</button>
+              <form method="post" action="/tracker/share/delete-folder" style="display:inline;"
+                    hx-post="/tracker/share/delete-folder"
+                    hx-target="#folder-{{ loop.index }}"
+                    hx-swap="outerHTML">
+                <input type="hidden" name="folder_name" value="{{ folder.name }}">
+                <button type="submit" class="btn btn-danger" style="padding:3px 12px;font-size:.78rem;">Yes, delete</button>
+              </form>
+            </span>
           </div>
         </td>
       </tr>
@@ -95,24 +93,21 @@
         <td style="white-space:nowrap;color:#64748b;font-size:.85rem;">{{ entry.size_bytes | filesize }}</td>
         <td></td>
         <td style="text-align:right;white-space:nowrap;" x-data="{confirm: false}">
-          <template x-if="!confirm">
-            <button class="btn btn-ghost"
-                    style="padding:2px 8px;font-size:.75rem;color:#dc2626;border-color:#fecaca;"
-                    @click="confirm=true">Delete</button>
-          </template>
-          <template x-if="confirm">
-            <span style="display:inline-flex;align-items:center;gap:.35rem;">
-              <span style="font-size:.75rem;color:#64748b;">Sure?</span>
-              <button class="btn btn-ghost" style="padding:2px 8px;font-size:.75rem;" @click="confirm=false">No</button>
-              <form method="post" action="/tracker/share/delete" style="display:inline;"
-                    hx-post="/tracker/share/delete"
-                    hx-target="closest tr"
-                    hx-swap="outerHTML">
-                <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
-                <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:.75rem;">Yes</button>
-              </form>
-            </span>
-          </template>
+          <button class="btn btn-ghost"
+                  style="padding:2px 8px;font-size:.75rem;color:#dc2626;border-color:#fecaca;"
+                  x-show="!confirm"
+                  @click="confirm=true">Delete</button>
+          <span style="display:inline-flex;align-items:center;gap:.35rem;" x-show="confirm">
+            <span style="font-size:.75rem;color:#64748b;">Sure?</span>
+            <button class="btn btn-ghost" style="padding:2px 8px;font-size:.75rem;" @click="confirm=false">No</button>
+            <form method="post" action="/tracker/share/delete" style="display:inline;"
+                  hx-post="/tracker/share/delete"
+                  hx-target="closest tr"
+                  hx-swap="outerHTML">
+              <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
+              <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:.75rem;">Yes</button>
+            </form>
+          </span>
         </td>
       </tr>
       {% endfor %}
@@ -134,24 +129,21 @@
         <td style="white-space:nowrap;color:#64748b;">{{ entry.size_bytes | filesize }}</td>
         <td></td>
         <td style="text-align:right;white-space:nowrap;" x-data="{confirm: false}">
-          <template x-if="!confirm">
-            <button class="btn btn-ghost"
-                    style="padding:2px 8px;font-size:.75rem;color:#dc2626;border-color:#fecaca;"
-                    @click="confirm=true">Delete</button>
-          </template>
-          <template x-if="confirm">
-            <span style="display:inline-flex;align-items:center;gap:.35rem;">
-              <span style="font-size:.75rem;color:#64748b;">Sure?</span>
-              <button class="btn btn-ghost" style="padding:2px 8px;font-size:.75rem;" @click="confirm=false">No</button>
-              <form method="post" action="/tracker/share/delete" style="display:inline;"
-                    hx-post="/tracker/share/delete"
-                    hx-target="closest tr"
-                    hx-swap="outerHTML">
-                <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
-                <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:.75rem;">Yes</button>
-              </form>
-            </span>
-          </template>
+          <button class="btn btn-ghost"
+                  style="padding:2px 8px;font-size:.75rem;color:#dc2626;border-color:#fecaca;"
+                  x-show="!confirm"
+                  @click="confirm=true">Delete</button>
+          <span style="display:inline-flex;align-items:center;gap:.35rem;" x-show="confirm">
+            <span style="font-size:.75rem;color:#64748b;">Sure?</span>
+            <button class="btn btn-ghost" style="padding:2px 8px;font-size:.75rem;" @click="confirm=false">No</button>
+            <form method="post" action="/tracker/share/delete" style="display:inline;"
+                  hx-post="/tracker/share/delete"
+                  hx-target="closest tr"
+                  hx-swap="outerHTML">
+              <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
+              <button type="submit" class="btn btn-danger" style="padding:2px 8px;font-size:.75rem;">Yes</button>
+            </form>
+          </span>
         </td>
       </tr>
       {% endfor %}
