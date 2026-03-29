@@ -457,8 +457,10 @@ function getTagSelected(selectId, textId) {
 }
 
 function settingsApp() {
+  const _validTabs = ['librarian', 'tracker', 'notifications', 'danger'];
+  const _urlTab = new URLSearchParams(window.location.search).get('tab');
   return {
-    tab: 'librarian',
+    tab: _validTabs.includes(_urlTab) ? _urlTab : 'librarian',
 
     // Librarian tab tracking state
     radarrUrl:  {{ config.radarr_url | tojson }},

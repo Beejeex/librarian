@@ -16,6 +16,7 @@ Provides:
   GET  /api/tracker/share/stats-html    — HTML progress-bar fragment for HTMX
   GET  /api/tracker/radarr/tags         — HTML <select> fragment of Radarr tags
   GET  /api/tracker/sonarr/tags         — HTML <select> fragment of Sonarr tags
+  GET  /api/tracker/reset-first-run     — reset radarr/sonarr first-run flag, redirect to settings
 """
 
 import asyncio
@@ -24,7 +25,7 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from sqlmodel import select
 
 from app.config import load_config
@@ -36,7 +37,7 @@ from app.log_buffer import (
     get_recent_tracker_logs,
     unsubscribe_tracker_log_queue,
 )
-from app.models import TrackedItem
+from app.models import AppConfig, TrackedItem
 from app.scheduler import run_poll
 
 logger = logging.getLogger(__name__)
@@ -279,6 +280,30 @@ async def share_stats_html():
         {fs_stats['file_count']} files &middot; {fs_stats['size_gb']} GB on share
     </p>
     """
+
+
+# ---------------------------------------------------------------------------
+# Danger Zone
+# ---------------------------------------------------------------------------
+
+@router.get("/reset-first-run")
+def reset_first_run(source: str = ""):
+    """Reset the first-run flag for radarr or sonarr, then redirect to the Danger Zone tab."""
+    if source not in ("radarr", "sonarr"):
+        raise HTTPException(status_code=400, detail="source must be 'radarr' or 'sonarr'")
+    with get_session() as session:
+        config = session.get(AppConfig, 1)
+        if not config:
+            raise HTTPException(status_code=500, detail="AppConfig not found.")
+        if source == "radarr":
+            config.radarr_first_run_complete = False
+        else:
+            config.sonarr_first_run_complete = False
+        config.updated_at = datetime.now(timezone.utc)
+        session.add(config)
+        session.commit()
+    logger.info("Reset %s first-run flag.", source)
+    return RedirectResponse(url="/settings?tab=danger", status_code=302)
 
 
 # ---------------------------------------------------------------------------

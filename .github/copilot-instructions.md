@@ -467,6 +467,12 @@ container path:  /media/movies/Dune.2021.2160p/
 
 - **Host OS**: Windows — all terminal commands must use **PowerShell** syntax.
 - Use `;` to chain commands (not `&&`).
+- Unix commands **do not work**: `tail`, `grep`, `find`, `cat`, `head`, `rm -rf`, etc. are not available. Use PowerShell equivalents:
+  - `tail -n 5` → `Select-Object -Last 5`
+  - `head -n 5` → `Select-Object -First 5`
+  - `grep pattern file` → `Select-String -Pattern "..." -Path "..."`
+  - `cat file` → `Get-Content file`
+  - `rm -rf dir` → `Remove-Item -Recurse -Force dir`
 - The app runs exclusively inside Docker.
 
 ---
