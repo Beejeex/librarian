@@ -234,11 +234,22 @@ def check_quota(
     Return True if adding a file of prospective_bytes would still fit within quota.
 
     Rules:
-    - Backlog items are capped at 60% of each limit.
-    - New items can use the entire remaining capacity (total cap minus backlog usage).
+    - Total cap is a hard limit for every item.
+    - Backlog items are also subject to the tighter backlog sub-cap (60% of total).
     - A cap of 0 means unlimited.
     """
+    # Hard total cap — applies to all items
+    total_usage = get_quota_usage(session, is_backlog=None)
+    if config.max_share_size_gb > 0:
+        total_bytes = int(config.max_share_size_gb * (1024 ** 3))
+        if total_usage["size_bytes"] + prospective_bytes > total_bytes:
+            return False
+    if config.max_share_files > 0:
+        if total_usage["file_count"] + 1 > config.max_share_files:
+            return False
+
     if is_backlog:
+        # Backlog sub-cap (60% of total limits)
         usage = get_quota_usage(session, is_backlog=True)
         if config.max_share_size_gb > 0:
             limit_bytes = int(config.max_share_size_gb * 0.6 * (1024 ** 3))
@@ -247,15 +258,6 @@ def check_quota(
         if config.max_share_files > 0:
             limit_files = int(config.max_share_files * 0.6)
             if usage["file_count"] + 1 > limit_files:
-                return False
-    else:
-        total_usage = get_quota_usage(session, is_backlog=None)
-        if config.max_share_size_gb > 0:
-            total_bytes = int(config.max_share_size_gb * (1024 ** 3))
-            if total_usage["size_bytes"] + prospective_bytes > total_bytes:
-                return False
-        if config.max_share_files > 0:
-            if total_usage["file_count"] + 1 > config.max_share_files:
                 return False
 
     return True

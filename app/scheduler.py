@@ -547,7 +547,15 @@ async def _copy_pending_items(config: AppConfig, semaphore: asyncio.Semaphore) -
         approved: list[TrackedItem] = []
         for item in all_pending:
             sz = item.file_size_bytes or 0
+            # Total cap is a hard limit — check it for every item regardless of pool
+            if total_size_limit  and total_size_proj  + sz > total_size_limit:
+                logger.info("Total size quota full — skipping '%s' (will retry).", item.title)
+                continue
+            if total_files_limit and total_files_proj + 1  > total_files_limit:
+                logger.info("Total file quota full — skipping '%s' (will retry).", item.title)
+                continue
             if item.is_backlog:
+                # Backlog also has its own tighter sub-cap (60% of total)
                 if backlog_size_limit  and backlog_size_proj  + sz > backlog_size_limit:
                     logger.info("Backlog size quota full — skipping '%s' (will retry).", item.title)
                     continue
@@ -556,13 +564,6 @@ async def _copy_pending_items(config: AppConfig, semaphore: asyncio.Semaphore) -
                     continue
                 backlog_size_proj  += sz
                 backlog_files_proj += 1
-            else:
-                if total_size_limit  and total_size_proj  + sz > total_size_limit:
-                    logger.info("Total size quota full — skipping '%s' (will retry).", item.title)
-                    continue
-                if total_files_limit and total_files_proj + 1  > total_files_limit:
-                    logger.info("Total file quota full — skipping '%s' (will retry).", item.title)
-                    continue
 
             total_size_proj  += sz
             total_files_proj += 1
