@@ -21,9 +21,11 @@ Routes:
 import asyncio
 import logging
 import os
+import shutil
 from datetime import datetime, timezone
+from pathlib import Path
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlmodel import select
@@ -246,6 +248,78 @@ async def poll_indicator(request: Request):
             "copy_jobs": copy_progress.get_all(),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Share browser
+# ---------------------------------------------------------------------------
+
+@router.get("/share", response_class=HTMLResponse)
+async def share_browser(request: Request):
+    """Render the share directory browser."""
+    config = load_config()
+    share_root = Path(config.share_path).resolve()
+    entries: list[dict] = []
+    total_size = 0
+    if share_root.exists():
+        for f in sorted(share_root.rglob("*")):
+            if f.is_file():
+                rel = f.relative_to(share_root)
+                sz = f.stat().st_size
+                total_size += sz
+                top_dir = rel.parts[0] if len(rel.parts) > 1 else ""
+                entries.append({
+                    "rel_path": rel.as_posix(),
+                    "size_bytes": sz,
+                    "top_dir": top_dir,
+                    "name": f.name,
+                })
+    try:
+        du = shutil.disk_usage(share_root)
+        disk = {"total": du.total, "used": du.used, "free": du.free}
+    except Exception:
+        disk = None
+    return templates.TemplateResponse(
+        "tracker_share.html",
+        {
+            "request": request,
+            "entries": entries,
+            "total_size": total_size,
+            "file_count": len(entries),
+            "disk": disk,
+            "share_path": str(share_root),
+        },
+    )
+
+
+@router.post("/share/delete", response_class=HTMLResponse)
+async def delete_share_file(rel_path: str = Form(...)):
+    """Delete a single file from the share directory."""
+    config = load_config()
+    share_root = Path(config.share_path).resolve()
+    try:
+        target = (share_root / rel_path).resolve()
+        target.relative_to(share_root)  # raises ValueError if outside share_root
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid path.")
+    try:
+        if target.is_file():
+            target.unlink()
+            # Clean up empty parent directories up to (but not including) share_root
+            parent = target.parent
+            while parent != share_root:
+                if parent.exists() and not any(parent.iterdir()):
+                    parent.rmdir()
+                    parent = parent.parent
+                else:
+                    break
+        return HTMLResponse("")
+    except Exception as exc:
+        logger.error("Failed to delete share file %s: %s", rel_path, exc)
+        return HTMLResponse(
+            f'<tr><td colspan="4" style="color:#dc2626;padding:8px 12px">'
+            f"Error deleting {rel_path}: {exc}</td></tr>"
+        )
 
 
 @router.get("/items/rows-fragment", response_class=HTMLResponse)

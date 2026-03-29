@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Librarian — Share Browser{% endblock %}
+
+{% block content %}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+  <h1 style="margin:0">📂 Share</h1>
+  <a href="/tracker" class="btn btn-ghost">← Dashboard</a>
+</div>
+
+{# ── Stats bar ───────────────────────────────────────────────────────────── #}
+<div class="card" style="padding:1rem 1.5rem;margin-bottom:1.25rem;">
+  <div style="display:flex;gap:2.5rem;flex-wrap:wrap;align-items:center;">
+    <div>
+      <div style="color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Files</div>
+      <div style="font-size:1.25rem;font-weight:700">{{ file_count }}</div>
+    </div>
+    <div>
+      <div style="color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Total size</div>
+      <div style="font-size:1.25rem;font-weight:700">{{ total_size | filesize }}</div>
+    </div>
+    {% if disk %}
+    <div>
+      <div style="color:#64748b;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">Free on disk</div>
+      <div style="font-size:1.25rem;font-weight:700">{{ disk.free | filesize }}</div>
+    </div>
+    {% endif %}
+    <div style="margin-left:auto;color:#94a3b8;font-size:.78rem;font-family:monospace">{{ share_path }}</div>
+  </div>
+</div>
+
+{# ── File table ──────────────────────────────────────────────────────────── #}
+{% if entries %}
+<div class="card" style="padding:0;overflow:hidden;">
+  <table>
+    <thead>
+      <tr>
+        <th>Folder</th>
+        <th>File</th>
+        <th>Size</th>
+        <th style="text-align:right">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for folder, files in entries | groupby("top_dir") %}
+      {% if folder %}
+      <tr>
+        <td colspan="4"
+            style="background:#f8fafc;color:#475569;font-weight:600;font-size:.8rem;padding:6px 12px;border-bottom:1px solid #e2e8f0;">
+          📁 {{ folder }}
+        </td>
+      </tr>
+      {% endif %}
+      {% for entry in files %}
+      <tr>
+        <td style="color:#94a3b8;font-size:.8rem;width:1%;white-space:nowrap;padding-left:1.75rem;">
+          {% if not folder %}📄{% endif %}
+        </td>
+        <td style="max-width:480px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
+            title="{{ entry.rel_path }}">
+          {{ entry.name }}
+        </td>
+        <td style="white-space:nowrap;color:#64748b;">{{ entry.size_bytes | filesize }}</td>
+        <td style="text-align:right;white-space:nowrap;" x-data="{confirm: false}">
+          <template x-if="!confirm">
+            <button class="btn btn-danger"
+                    style="padding:3px 10px;font-size:.78rem;"
+                    @click="confirm=true">Delete</button>
+          </template>
+          <template x-if="confirm">
+            <span style="display:inline-flex;align-items:center;gap:.4rem;">
+              <span style="font-size:.78rem;color:#64748b;">Sure?</span>
+              <button class="btn btn-ghost"
+                      style="padding:3px 10px;font-size:.78rem;"
+                      @click.stop="confirm=false">No</button>
+              <form method="post" action="/tracker/share/delete"
+                    style="display:inline;"
+                    hx-post="/tracker/share/delete"
+                    hx-target="closest tr"
+                    hx-swap="outerHTML">
+                <input type="hidden" name="rel_path" value="{{ entry.rel_path }}">
+                <button type="submit"
+                        class="btn btn-danger"
+                        style="padding:3px 10px;font-size:.78rem;">Yes</button>
+              </form>
+            </span>
+          </template>
+        </td>
+      </tr>
+      {% endfor %}
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <p style="color:#94a3b8;text-align:center;padding:2rem;">
+    No files found on share at <code>{{ share_path }}</code>.
+  </p>
+</div>
+{% endif %}
+{% endblock %}
