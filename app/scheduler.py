@@ -30,6 +30,7 @@ from app.copier import (
     check_quota,
     copy_file,
     get_file_size,
+    get_quota_usage,
 )
 from app.database import get_session
 from app.models import AppConfig, TrackedItem
@@ -508,20 +509,67 @@ async def _process_item(
 
 async def _copy_pending_items(config: AppConfig, semaphore: asyncio.Semaphore) -> None:
     """
-    Copy all pending items in priority order: non-backlog first, then backlog.
+    Copy pending items in priority order: non-backlog first, then backlog.
 
-    Run two sequential gather batches so that new arrivals always start copying
-    before backlog items, regardless of when they were first seen.
+    Pre-selects the items that fit within quota *before* dispatching any copies,
+    so concurrent copies cannot collectively exceed the cap.
     """
     with get_session() as session:
-        items = session.exec(
+        all_pending = session.exec(
             select(TrackedItem)
             .where(TrackedItem.status == "pending")
             .order_by(TrackedItem.is_backlog.asc(), TrackedItem.created_at.asc())
         ).all()
 
-    non_backlog = [i for i in items if not i.is_backlog]
-    backlog     = [i for i in items if i.is_backlog]
+        # ── Quota pre-selection ──────────────────────────────────────────────
+        # Walk through candidates in priority order, maintaining a running
+        # projection of bytes+files that *will* be added. Items that would
+        # exceed the cap are skipped (left as pending for the next poll).
+        #
+        # We track two budgets independently:
+        #   backlog_proj  — bytes/files that will be added to the backlog pool
+        #   total_proj    — bytes/files that will be added across both pools
+
+        backlog_usage = get_quota_usage(session, is_backlog=True)
+        total_usage   = get_quota_usage(session, is_backlog=None)
+
+        backlog_size_proj  = backlog_usage["size_bytes"]
+        backlog_files_proj = backlog_usage["file_count"]
+        total_size_proj    = total_usage["size_bytes"]
+        total_files_proj   = total_usage["file_count"]
+
+        gb = 1024 ** 3
+        backlog_size_limit  = int(config.max_share_size_gb * 0.6 * gb) if config.max_share_size_gb > 0 else 0
+        backlog_files_limit = int(config.max_share_files  * 0.6)       if config.max_share_files  > 0 else 0
+        total_size_limit    = int(config.max_share_size_gb * gb)        if config.max_share_size_gb > 0 else 0
+        total_files_limit   = config.max_share_files
+
+        approved: list[TrackedItem] = []
+        for item in all_pending:
+            sz = item.file_size_bytes or 0
+            if item.is_backlog:
+                if backlog_size_limit  and backlog_size_proj  + sz > backlog_size_limit:
+                    logger.info("Backlog size quota full — skipping '%s' (will retry).", item.title)
+                    continue
+                if backlog_files_limit and backlog_files_proj + 1  > backlog_files_limit:
+                    logger.info("Backlog file quota full — skipping '%s' (will retry).", item.title)
+                    continue
+                backlog_size_proj  += sz
+                backlog_files_proj += 1
+            else:
+                if total_size_limit  and total_size_proj  + sz > total_size_limit:
+                    logger.info("Total size quota full — skipping '%s' (will retry).", item.title)
+                    continue
+                if total_files_limit and total_files_proj + 1  > total_files_limit:
+                    logger.info("Total file quota full — skipping '%s' (will retry).", item.title)
+                    continue
+
+            total_size_proj  += sz
+            total_files_proj += 1
+            approved.append(item)
+
+    non_backlog = [i for i in approved if not i.is_backlog]
+    backlog     = [i for i in approved if i.is_backlog]
 
     if non_backlog:
         await asyncio.gather(*[_copy_item(config, semaphore, item) for item in non_backlog])
@@ -530,19 +578,13 @@ async def _copy_pending_items(config: AppConfig, semaphore: asyncio.Semaphore) -
 
 
 async def _copy_item(config: AppConfig, semaphore: asyncio.Semaphore, item: TrackedItem) -> None:
-    """Run quota check + file copy for a single pending TrackedItem."""
+    """Copy a single pre-approved pending TrackedItem."""
     src_size = item.file_size_bytes or 0
 
+    # Re-check status in case it changed since pre-selection (e.g. manual reset)
     with get_session() as session:
         db_item = session.get(TrackedItem, item.id)
         if db_item is None or db_item.status != "pending":
-            return
-        if not check_quota(session, config, db_item.is_backlog, prospective_bytes=src_size):
-            pool_label = "backlog" if db_item.is_backlog else "new"
-            logger.info(
-                "Quota full for %s pool — leaving '%s' as pending (will retry).",
-                pool_label, item.title,
-            )
             return
 
     try:
