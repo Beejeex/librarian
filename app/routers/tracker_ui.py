@@ -249,12 +249,26 @@ async def poll_indicator(request: Request):
 
 
 @router.get("/items/rows-fragment", response_class=HTMLResponse)
-async def items_rows_fragment(request: Request, sort: str = "updated", dir: str = "desc"):
+async def items_rows_fragment(
+    request: Request,
+    sort: str = "updated",
+    dir: str = "desc",
+    filter: str = "all",
+    search: str = "",
+):
     """Return only the <tr> rows for the items table for HTMX tbody refresh."""
     with get_session() as session:
-        all_items = session.exec(
-            select(TrackedItem).order_by(_order_by(sort, dir))
-        ).all()
+        q = select(TrackedItem)
+        if filter != "all":
+            q = q.where(TrackedItem.status == filter)
+        q = q.order_by(_order_by(sort, dir))
+        all_items = session.exec(q).all()
+    if search:
+        sl = search.lower()
+        all_items = [
+            i for i in all_items
+            if sl in (i.title or "").lower() or sl in (i.series_title or "").lower()
+        ]
     return templates.TemplateResponse(
         "_tracker_items_rows.html",
         {"request": request, "items": all_items},

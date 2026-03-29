@@ -1,8 +1,5 @@
 {% for item in items %}
-<tr x-show="
-  (filter === 'all' || filter === '{{ item.status }}') &&
-  (!search || '{{ item.title | lower }}'.includes(search.toLowerCase()) || '{{ (item.series_title or '') | lower }}'.includes(search.toLowerCase()))
-">
+<tr>
   <td>
     <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;" title="{{ item.title }}">
       {{ item.title }}
