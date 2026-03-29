@@ -48,16 +48,16 @@ def _make_config(**kwargs) -> AppConfig:
 
 class TestBuildMovieSharePath:
     def test_basic(self):
-        result = build_movie_share_path("/share", "Dune Part Two", 2024, "dune.mkv")
-        assert result == os.path.join("/share", "Dune Part Two (2024)", "dune.mkv")
+        result = build_movie_share_path("/share", "/movies/Dune Part Two (2024) {tmdb-693134}/dune.mkv", "/movies")
+        assert result == os.path.join("/share", "Dune Part Two (2024) {tmdb-693134}", "dune.mkv")
 
-    def test_folder_includes_year(self):
-        result = build_movie_share_path("/share", "Interstellar", 2014, "file.mkv")
+    def test_folder_preserved_from_path(self):
+        result = build_movie_share_path("/share", "/movies/Interstellar (2014) {tmdb-157336}/file.mkv", "/movies")
         parts = result.split(os.sep)
-        assert "Interstellar (2014)" in parts
+        assert "Interstellar (2014) {tmdb-157336}" in parts
 
     def test_custom_share_root(self):
-        result = build_movie_share_path("/mnt/storage", "Film", 2020, "film.mkv")
+        result = build_movie_share_path("/mnt/storage", "/movies/Film (2020)/film.mkv", "/movies")
         assert result.startswith("/mnt/storage")
 
 
@@ -67,21 +67,21 @@ class TestBuildMovieSharePath:
 
 class TestBuildEpisodeSharePath:
     def test_basic(self):
-        result = build_episode_share_path("/share", "Breaking Bad", 1, "s01e01.mkv")
-        assert result == os.path.join("/share", "Breaking Bad", "Season 01", "s01e01.mkv")
+        result = build_episode_share_path("/share", "/tv/Breaking Bad (2008) {tvdb-81189}/Season 01/s01e01.mkv", "/tv")
+        assert result == os.path.join("/share", "Breaking Bad (2008) {tvdb-81189}", "Season 01", "s01e01.mkv")
 
-    def test_season_padding(self):
-        result = build_episode_share_path("/share", "Series", 5, "ep.mkv")
+    def test_season_folder_preserved(self):
+        result = build_episode_share_path("/share", "/tv/Series/Season 05/ep.mkv", "/tv")
         assert "Season 05" in result
 
     def test_two_digit_season(self):
-        result = build_episode_share_path("/share", "Series", 12, "ep.mkv")
+        result = build_episode_share_path("/share", "/tv/Series/Season 12/ep.mkv", "/tv")
         assert "Season 12" in result
 
     def test_series_folder_name(self):
-        result = build_episode_share_path("/share", "The Wire", 2, "file.mkv")
+        result = build_episode_share_path("/share", "/tv/The Wire (2002) {tvdb-79126}/Season 02/file.mkv", "/tv")
         parts = result.split(os.sep)
-        assert "The Wire" in parts
+        assert "The Wire (2002) {tvdb-79126}" in parts
         assert "Season 02" in parts
 
 

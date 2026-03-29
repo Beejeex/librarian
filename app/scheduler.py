@@ -247,9 +247,8 @@ async def _poll_radarr(
     for entry in seen.values():
         movie = entry["movie"]
         matched_tags = ",".join(sorted(entry["tags"]))
-        filename = movie.file_path.split("/")[-1]
         share_path = build_movie_share_path(
-            config.share_path, movie.title, movie.year, filename
+            config.share_path, movie.file_path, config.radarr_root_folder
         )
         container_path = _remap_media_path(
             movie.file_path, config.radarr_root_folder, "movies"
@@ -309,9 +308,8 @@ async def _poll_sonarr(
     for entry in seen.values():
         ef = entry["ef"]
         matched_tags = ",".join(sorted(entry["tags"]))
-        filename = ef.file_path.split("/")[-1]
         share_path = build_episode_share_path(
-            config.share_path, ef.series_title, ef.season_number, filename
+            config.share_path, ef.file_path, config.sonarr_root_folder
         )
         container_path = _remap_media_path(
             ef.file_path, config.sonarr_root_folder, "tv"

@@ -139,41 +139,52 @@ def _copy_file_sync(
             copy_progress.finish(item_id)
 
 
-def build_movie_share_path(share_root: str, title: str, year: int, filename: str) -> str:
+def build_movie_share_path(share_root: str, arr_file_path: str, root_folder: str) -> str:
     """
     Build the destination path for a movie file on the share.
 
-    Structure: /share/<Title (Year)>/<original filename>
+    Derives the folder name directly from the arr-reported file path so the
+    share structure always mirrors what Radarr actually has on disk, regardless
+    of the naming format configured in settings.
 
-    Args:
-        share_root: Root of the share mount, e.g. "/share".
-        title:      Movie title as returned by Radarr.
-        year:       Release year.
-        filename:   Original filename (basename only).
-    """
-    folder = f"{title} ({year})"
-    return os.path.join(share_root, folder, filename)
-
-
-def build_episode_share_path(
-    share_root: str,
-    series_title: str,
-    season_number: int,
-    filename: str,
-) -> str:
-    """
-    Build the destination path for a TV episode file on the share.
-
-    Structure: /share/<Series Title>/Season XX/<original filename>
+    Structure: /share/<arr folder name>/<original filename>
 
     Args:
         share_root:    Root of the share mount, e.g. "/share".
-        series_title:  Series name as returned by Sonarr.
-        season_number: Season number (used to format the season folder).
-        filename:      Original filename (basename only).
+        arr_file_path: Absolute file path as reported by Radarr.
+        root_folder:   Radarr root folder prefix (e.g. "/movies").
     """
-    season_folder = f"Season {season_number:02d}"
-    return os.path.join(share_root, series_title, season_folder, filename)
+    remaining = arr_file_path.removeprefix(root_folder).lstrip("/")
+    parts = remaining.split("/")
+    if len(parts) >= 2:
+        folder, filename = parts[0], parts[-1]
+        return os.path.join(share_root, folder, filename)
+    # File sits directly in root_folder (no subfolder) — unlikely but safe
+    return os.path.join(share_root, parts[-1])
+
+
+def build_episode_share_path(share_root: str, arr_file_path: str, root_folder: str) -> str:
+    """
+    Build the destination path for a TV episode file on the share.
+
+    Derives folder names directly from the arr-reported file path so the
+    share structure always mirrors what Sonarr actually has on disk, regardless
+    of the naming format configured in settings.
+
+    Structure: /share/<series folder>/<season folder>/<original filename>
+
+    Args:
+        share_root:    Root of the share mount, e.g. "/share".
+        arr_file_path: Absolute file path as reported by Sonarr.
+        root_folder:   Sonarr root folder prefix (e.g. "/tv").
+    """
+    remaining = arr_file_path.removeprefix(root_folder).lstrip("/")
+    parts = remaining.split("/")
+    if len(parts) >= 3:
+        return os.path.join(share_root, parts[0], parts[1], parts[-1])
+    if len(parts) == 2:
+        return os.path.join(share_root, parts[0], parts[1])
+    return os.path.join(share_root, parts[-1])
 
 
 # ---------------------------------------------------------------------------
