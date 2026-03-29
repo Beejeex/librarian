@@ -288,7 +288,11 @@ async def share_stats_html():
 
 @router.get("/reset-first-run")
 def reset_first_run(source: str = ""):
-    """Reset the first-run flag for radarr or sonarr, then redirect to the Danger Zone tab."""
+    """
+    Reset the first-run flag for radarr or sonarr and delete all queued/pending
+    items for that source so the next poll re-indexes them as fresh backlog.
+    Redirect to the Danger Zone settings tab.
+    """
     if source not in ("radarr", "sonarr"):
         raise HTTPException(status_code=400, detail="source must be 'radarr' or 'sonarr'")
     with get_session() as session:
@@ -301,8 +305,20 @@ def reset_first_run(source: str = ""):
             config.sonarr_first_run_complete = False
         config.updated_at = datetime.now(timezone.utc)
         session.add(config)
+
+        # Remove unprocessed items so the next poll re-creates them as backlog
+        stale = session.exec(
+            select(TrackedItem).where(
+                TrackedItem.source == source,
+                TrackedItem.status.in_(["queued", "pending"]),
+            )
+        ).all()
+        deleted = len(stale)
+        for item in stale:
+            session.delete(item)
+
         session.commit()
-    logger.info("Reset %s first-run flag.", source)
+    logger.info("Reset %s first-run flag; deleted %d queued/pending items.", source, deleted)
     return RedirectResponse(url="/settings?tab=danger", status_code=302)
 
 
