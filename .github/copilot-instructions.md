@@ -493,6 +493,8 @@ Registry: `ghcr.io/beejeex/librarian`
 
 After a passing build+test cycle, to release a new version:
 
+> **CRITICAL — always bump `app/version.py` first.** This is the version shown in the nav bar. Forgetting it means the UI displays the wrong version even though the image tag is correct.
+
 1. Bump `VERSION` in `app/version.py` (e.g. `v0.0.7`).
 2. Commit: `git add -A; git commit -m "chore: bump version to vX.Y.Z"`
 3. Build the image: `docker build -t librarian .`
