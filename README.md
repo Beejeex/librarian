@@ -1,5 +1,8 @@
 # Librarian
 
+> **⚠ Beta software — use at your own risk.**
+> Librarian is provided as-is, without warranty of any kind. It performs destructive operations on media libraries (folder renames, file copies, path updates in Radarr/Sonarr). Always maintain independent backups of your media and arr databases before using this tool. The authors accept no responsibility for data loss or corruption.
+
 Self-hosted, single-container tool with two integrated functions:
 
 - **Renamer** — detects Radarr/Sonarr library folders whose names don't match the configured naming template, renames them on the mounted share, and updates the arr database paths via their REST APIs. No file moves are performed by the arr apps themselves.
