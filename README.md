@@ -1,5 +1,7 @@
 # Librarian
 
+[![License: CC BY-NC-ND 4.0](https://img.shields.io/badge/License-CC%20BY--NC--ND%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-nd/4.0/)
+
 > **⚠ Beta software — use at your own risk.**
 > Librarian is provided as-is, without warranty of any kind. It performs destructive operations on media libraries (folder renames, file copies, path updates in Radarr/Sonarr). Always maintain independent backups of your media and arr databases before using this tool. The authors accept no responsibility for data loss or corruption.
 
