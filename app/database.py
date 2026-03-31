@@ -54,6 +54,12 @@ def _run_migrations() -> None:
         ("appconfig", "ntfy_on_error", "BOOLEAN NOT NULL DEFAULT 1"),
         ("appconfig", "ntfy_on_finished", "BOOLEAN NOT NULL DEFAULT 1"),
         ("appconfig", "ntfy_on_first_run", "BOOLEAN NOT NULL DEFAULT 1"),
+        # Notifications: Apprise (added v0.3.0 — replaces ntfy)
+        ("appconfig", "apprise_urls", "VARCHAR NOT NULL DEFAULT ''"),
+        ("appconfig", "notify_on_copied", "BOOLEAN NOT NULL DEFAULT 1"),
+        ("appconfig", "notify_on_error", "BOOLEAN NOT NULL DEFAULT 1"),
+        ("appconfig", "notify_on_finished", "BOOLEAN NOT NULL DEFAULT 1"),
+        ("appconfig", "notify_on_first_run", "BOOLEAN NOT NULL DEFAULT 1"),
         # Tracker: TrackedItem fields (added in v0.1.0)
         ("trackeditem", "is_upgraded", "BOOLEAN NOT NULL DEFAULT 0"),
         # Renamer: file rename support

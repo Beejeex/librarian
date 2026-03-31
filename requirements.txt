@@ -8,6 +8,7 @@ python-multipart
 apscheduler==3.11.0
 watchdog==6.0.0
 aiosqlite
+apprise
 pytest
 pytest-asyncio
 pytest-httpx

@@ -28,9 +28,7 @@ ENV RADARR_URL="" \
     MAX_SHARE_SIZE_GB="0" \
     MAX_SHARE_FILES="0" \
     SHARE_PATH="/share" \
-    NTFY_URL="https://ntfy.sh" \
-    NTFY_TOPIC="" \
-    NTFY_TOKEN="" \
+    APPRISE_URLS="" \
     TZ="UTC"
 
 EXPOSE 8080

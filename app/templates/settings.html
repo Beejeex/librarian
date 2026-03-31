@@ -340,60 +340,49 @@
   {# ══════════════════════════════════════════════════════════ #}
   {# TAB: Notifications                                        #}
   {# ══════════════════════════════════════════════════════════ #}
-  <div x-show="tab === 'notifications'">
+    <div x-show="tab === 'notifications'">
 
     <div class="card">
-      <h2 style="margin-bottom:1.25rem;">🔔 ntfy.sh Notifications</h2>
+      <h2 style="margin-bottom:.5rem;">🔔 Apprise Notifications</h2>
+      <p style="font-size:.85rem;color:#94a3b8;margin-bottom:1.25rem;">
+        Enter one Apprise URL per line. Supports 60+ services — ntfy, Discord, Telegram, Slack, Pushover, Gotify, and more.<br>
+        See <a href="https://github.com/caronc/apprise/wiki" target="_blank" rel="noopener"
+               style="color:#3b82f6;">github.com/caronc/apprise/wiki</a> for the full URL format list.
+        Leave empty to disable notifications.
+      </p>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
-
-        <div class="form-group">
-          <label for="ntfy_url">ntfy Server URL</label>
-          <input type="text" id="ntfy_url" name="ntfy_url"
-                 value="{{ config.ntfy_url }}" placeholder="https://ntfy.sh">
-          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">Use your self-hosted URL or leave as <code>https://ntfy.sh</code>.</p>
-        </div>
-
-        <div class="form-group">
-          <label for="ntfy_topic">Topic</label>
-          <input type="text" id="ntfy_topic" name="ntfy_topic"
-                 value="{{ config.ntfy_topic }}" placeholder="my-librarian-topic">
-          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">Leave empty to disable notifications.</p>
-        </div>
-
-        <div class="form-group">
-          <label for="ntfy_token">Bearer Token (optional)</label>
-          <input type="password" id="ntfy_token" name="ntfy_token"
-                 value="{{ config.ntfy_token }}" placeholder="tk_…">
-          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">For private ntfy topics requiring authentication.</p>
-        </div>
-
+      <div class="form-group" style="margin-bottom:1.25rem;">
+        <label for="apprise_urls">Notification URLs</label>
+        <textarea id="apprise_urls" name="apprise_urls" rows="5"
+                  placeholder="ntfy://ntfy.sh/my-topic&#10;discord://webhook-id/token&#10;tgram://bot_token/chat_id"
+                  style="font-family:monospace;font-size:.85rem;">{{ config.apprise_urls }}</textarea>
+        <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">One URL per line. All listed services will receive every enabled notification.</p>
       </div>
 
       <div style="margin-top:1.25rem;">
         <p style="font-weight:600;margin-bottom:.75rem;">Notify on:</p>
         <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:.75rem;">
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-            <input type="checkbox" name="ntfy_on_copied" value="true"
-                   {% if config.ntfy_on_copied %}checked{% endif %}
+            <input type="checkbox" name="notify_on_copied" value="true"
+                   {% if config.notify_on_copied %}checked{% endif %}
                    style="accent-color:#3b82f6;width:16px;height:16px;">
             File copied
           </label>
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-            <input type="checkbox" name="ntfy_on_error" value="true"
-                   {% if config.ntfy_on_error %}checked{% endif %}
+            <input type="checkbox" name="notify_on_error" value="true"
+                   {% if config.notify_on_error %}checked{% endif %}
                    style="accent-color:#3b82f6;width:16px;height:16px;">
             Copy error
           </label>
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-            <input type="checkbox" name="ntfy_on_finished" value="true"
-                   {% if config.ntfy_on_finished %}checked{% endif %}
+            <input type="checkbox" name="notify_on_finished" value="true"
+                   {% if config.notify_on_finished %}checked{% endif %}
                    style="accent-color:#3b82f6;width:16px;height:16px;">
             File deleted from share
           </label>
           <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">
-            <input type="checkbox" name="ntfy_on_first_run" value="true"
-                   {% if config.ntfy_on_first_run %}checked{% endif %}
+            <input type="checkbox" name="notify_on_first_run" value="true"
+                   {% if config.notify_on_first_run %}checked{% endif %}
                    style="accent-color:#3b82f6;width:16px;height:16px;">
             First-run index complete
           </label>

@@ -42,13 +42,11 @@ def _seed_from_env() -> dict:
         "max_concurrent_copies": int(os.getenv("MAX_CONCURRENT_COPIES", "2")),
         "max_share_size_gb": float(os.getenv("MAX_SHARE_SIZE_GB", "0")),
         "max_share_files": int(os.getenv("MAX_SHARE_FILES", "0")),
-        "ntfy_url": os.getenv("NTFY_URL", "https://ntfy.sh"),
-        "ntfy_topic": os.getenv("NTFY_TOPIC", ""),
-        "ntfy_token": os.getenv("NTFY_TOKEN", ""),
-        "ntfy_on_copied": os.getenv("NTFY_ON_COPIED", "true").lower() == "true",
-        "ntfy_on_error": os.getenv("NTFY_ON_ERROR", "true").lower() == "true",
-        "ntfy_on_finished": os.getenv("NTFY_ON_FINISHED", "true").lower() == "true",
-        "ntfy_on_first_run": os.getenv("NTFY_ON_FIRST_RUN", "true").lower() == "true",
+        "apprise_urls": os.getenv("APPRISE_URLS", ""),
+        "notify_on_copied": os.getenv("NOTIFY_ON_COPIED", "true").lower() == "true",
+        "notify_on_error": os.getenv("NOTIFY_ON_ERROR", "true").lower() == "true",
+        "notify_on_finished": os.getenv("NOTIFY_ON_FINISHED", "true").lower() == "true",
+        "notify_on_first_run": os.getenv("NOTIFY_ON_FIRST_RUN", "true").lower() == "true",
     }
 
 

@@ -230,13 +230,11 @@ async def save_settings(
     share_path: str = Form("/share"),
     require_approval: str = Form(""),  # checkbox: "true" or ""
     # Notifications
-    ntfy_url: str = Form("https://ntfy.sh"),
-    ntfy_topic: str = Form(""),
-    ntfy_token: str = Form(""),
-    ntfy_on_copied: str = Form(""),
-    ntfy_on_error: str = Form(""),
-    ntfy_on_finished: str = Form(""),
-    ntfy_on_first_run: str = Form(""),
+    apprise_urls: str = Form(""),
+    notify_on_copied: str = Form(""),
+    notify_on_error: str = Form(""),
+    notify_on_finished: str = Form(""),
+    notify_on_first_run: str = Form(""),
 ):
     """Handle settings form POST — save config and re-render with success flag."""
     save_config(
@@ -261,13 +259,11 @@ async def save_settings(
             "max_share_files": max_share_files,
             "share_path": share_path,
             "require_approval": require_approval == "true",
-            "ntfy_url": ntfy_url,
-            "ntfy_topic": ntfy_topic,
-            "ntfy_token": ntfy_token,
-            "ntfy_on_copied": ntfy_on_copied == "true",
-            "ntfy_on_error": ntfy_on_error == "true",
-            "ntfy_on_finished": ntfy_on_finished == "true",
-            "ntfy_on_first_run": ntfy_on_first_run == "true",
+            "apprise_urls": apprise_urls,
+            "notify_on_copied": notify_on_copied == "true",
+            "notify_on_error": notify_on_error == "true",
+            "notify_on_finished": notify_on_finished == "true",
+            "notify_on_first_run": notify_on_first_run == "true",
         },
     )
     # Reschedule the poll loop with the new interval

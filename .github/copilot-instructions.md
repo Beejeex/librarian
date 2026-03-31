@@ -214,13 +214,11 @@ Single-row configuration table (id always = 1).
 | max_concurrent_copies | int | `2` | Tracker: asyncio.Semaphore width per poll |
 | max_share_size_gb | float | `0.0` | Tracker: total size cap in GB; 0 = unlimited |
 | max_share_files | int | `0` | Tracker: total file count cap; 0 = unlimited |
-| ntfy_url | str | `https://ntfy.sh` | Notifications base URL |
-| ntfy_topic | str | `""` | Notifications topic; empty = disabled |
-| ntfy_token | str | `""` | Optional Bearer token |
-| ntfy_on_copied | bool | `True` | Notify on successful copy |
-| ntfy_on_error | bool | `True` | Notify on copy error |
-| ntfy_on_finished | bool | `True` | Notify on file deleted from share |
-| ntfy_on_first_run | bool | `True` | Notify when first-run index completes |
+| apprise_urls | str | `""` | Newline-separated Apprise notification URLs; empty = disabled |
+| notify_on_copied | bool | `True` | Notify on successful copy |
+| notify_on_error | bool | `True` | Notify on copy error |
+| notify_on_finished | bool | `True` | Notify on file deleted from share |
+| notify_on_first_run | bool | `True` | Notify when first-run index completes |
 | created_at | datetime | now | |
 | updated_at | datetime | now | |
 
@@ -317,7 +315,7 @@ librarian/
 │   ├── watcher.py         # watchdog: /share delete → copied→finished
 │   ├── copier.py          # chunked copy, quota helpers, subtitle detection
 │   ├── copy_progress.py   # in-memory per-item copy progress for SSE
-│   ├── notifier.py        # ntfy.sh push notifications
+│   ├── notifier.py        # Apprise push notifications
 │   │
 │   ├── log_buffer.py
 │   ├── routers/
@@ -372,8 +370,7 @@ RUN mkdir -p /config /media/movies /media/tv /share
 
   **Tracker:** `RADARR_TAGS`, `SONARR_TAGS`, `POLL_INTERVAL_MINUTES` (default `15`), `REQUIRE_APPROVAL` (default `false`), `MAX_CONCURRENT_COPIES` (default `2`), `MAX_SHARE_SIZE_GB` (default `0`), `MAX_SHARE_FILES` (default `0`), `SHARE_PATH` (default `/share`)
 
-  **Notifications:** `NTFY_URL` (default `https://ntfy.sh`), `NTFY_TOPIC` (default `""`), `NTFY_TOKEN` (default `""`)
-
+  **Notifications:** `APPRISE_URLS` (default `""`; newline-separated Apprise URLs)
   **General:** `TZ` (default `UTC`)
 
 ### Run the app

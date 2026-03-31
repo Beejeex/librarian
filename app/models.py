@@ -55,14 +55,12 @@ class AppConfig(SQLModel, table=True):
     max_share_size_gb: float = 0.0  # total cap in GB; 0 = unlimited
     max_share_files: int = 0  # total file count cap; 0 = unlimited
 
-    # --- Notifications (ntfy.sh) ---
-    ntfy_url: str = "https://ntfy.sh"  # base URL; override for self-hosted
-    ntfy_topic: str = ""  # topic to publish to; empty = disabled
-    ntfy_token: str = ""  # optional Bearer token for private topics
-    ntfy_on_copied: bool = True
-    ntfy_on_error: bool = True
-    ntfy_on_finished: bool = True
-    ntfy_on_first_run: bool = True
+    # --- Notifications (Apprise) ---
+    apprise_urls: str = ""  # newline-separated Apprise notification URLs; empty = disabled
+    notify_on_copied: bool = True
+    notify_on_error: bool = True
+    notify_on_finished: bool = True
+    notify_on_first_run: bool = True
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
