@@ -471,6 +471,7 @@ container path:  /media/movies/Dune.2021.2160p/
   - `cat file` → `Get-Content file`
   - `rm -rf dir` → `Remove-Item -Recurse -Force dir`
 - The app runs exclusively inside Docker.
+- **Kubernetes cluster access is read-only**: when inspecting or querying the Kubernetes cluster (e.g. `kubectl get`, `kubectl describe`, `kubectl logs`, `kubectl exec` into a pod for inspection), only read-only commands are permitted. Never run commands that create, modify, delete, or patch cluster resources (`apply`, `create`, `delete`, `patch`, `edit`, `scale`, `rollout restart`, etc.) without explicit user confirmation.
 
 ---
 

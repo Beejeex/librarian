@@ -30,9 +30,9 @@ async def tags_page(request: Request) -> HTMLResponse:
     radarr_configured = bool(config.radarr_url and config.radarr_api_key)
     sonarr_configured = bool(config.sonarr_url and config.sonarr_api_key)
     return templates.TemplateResponse(
+        request,
         "tags.html",
         {
-            "request": request,
             "radarr_configured": radarr_configured,
             "sonarr_configured": sonarr_configured,
         },

@@ -69,9 +69,9 @@ async def dashboard(
 
     templates = get_templates()
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "radarr_run": radarr_run,
             "sonarr_run": sonarr_run,
             "config": config,
@@ -139,9 +139,9 @@ async def review(
 
     templates = get_templates()
     return templates.TemplateResponse(
+        request,
         "review.html",
         {
-            "request": request,
             "active_source": active_source,
             "radarr_run": radarr_run,
             "radarr_folder_items": radarr_folder_items,
@@ -174,9 +174,9 @@ async def apply_page(
     """
     templates = get_templates()
     return templates.TemplateResponse(
+        request,
         "logs.html",
         {
-            "request": request,
             "scan_run_id": scan_run_id,
             "batch_size": batch_size,
             "mode": "apply",
@@ -196,8 +196,9 @@ async def settings_page(
     config = get_config(session)
     templates = get_templates()
     return templates.TemplateResponse(
+        request,
         "settings.html",
-        {"request": request, "config": config, "saved": False},
+        {"config": config, "saved": False},
     )
 
 
@@ -272,8 +273,9 @@ async def save_settings(
     config = get_config(session)
     templates = get_templates()
     return templates.TemplateResponse(
+        request,
         "settings.html",
-        {"request": request, "config": config, "saved": True},
+        {"config": config, "saved": True},
     )
 
 
@@ -287,9 +289,9 @@ async def logs_page(request: Request):
     recent_lines = log_buffer.tail(200)
     templates = get_templates()
     return templates.TemplateResponse(
+        request,
         "logs.html",
         {
-            "request": request,
             "lines": recent_lines,
             "mode": "view",
         },

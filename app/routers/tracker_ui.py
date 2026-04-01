@@ -99,9 +99,9 @@ async def tracker_dashboard(request: Request):
     recent = sorted(all_items, key=lambda i: i.updated_at, reverse=True)[:10]
 
     return templates.TemplateResponse(
+        request,
         "tracker_dashboard.html",
         {
-            "request": request,
             "counts": counts,
             "recent": recent,
             "config": config,
@@ -129,8 +129,9 @@ async def tracker_items(request: Request):
             select(TrackedItem).order_by(TrackedItem.updated_at.desc())
         ).all()
     return templates.TemplateResponse(
+        request,
         "tracker_items.html",
-        {"request": request, "items": all_items},
+        {"items": all_items},
     )
 
 
@@ -203,7 +204,7 @@ async def approve_all_items():
 @router.get("/logs", response_class=HTMLResponse)
 async def tracker_logs(request: Request):
     """Render the Tracker live log viewer (SSE)."""
-    return templates.TemplateResponse("tracker_logs.html", {"request": request})
+    return templates.TemplateResponse(request, "tracker_logs.html")
 
 
 # ---------------------------------------------------------------------------
@@ -222,8 +223,9 @@ async def stats_fragment(request: Request):
     for item in all_items:
         counts[item.status] = counts.get(item.status, 0) + 1
     return templates.TemplateResponse(
+        request,
         "_tracker_stats_cards.html",
-        {"request": request, "counts": counts},
+        {"counts": counts},
     )
 
 
@@ -235,8 +237,9 @@ async def recent_fragment(request: Request, sort: str = "updated", dir: str = "d
             select(TrackedItem).order_by(_order_by(sort, dir)).limit(20)
         ).all()
     return templates.TemplateResponse(
+        request,
         "_tracker_recent_fragment.html",
-        {"request": request, "recent": recent, "sort": sort, "dir": dir},
+        {"recent": recent, "sort": sort, "dir": dir},
     )
 
 
@@ -244,9 +247,9 @@ async def recent_fragment(request: Request, sort: str = "updated", dir: str = "d
 async def poll_indicator(request: Request):
     """Return a copy-progress block when a poll is running, else empty."""
     return templates.TemplateResponse(
+        request,
         "_tracker_poll_indicator.html",
         {
-            "request": request,
             "poll_running": is_poll_running(),
             "copy_jobs": copy_progress.get_all(),
         },
@@ -307,9 +310,9 @@ async def share_browser(request: Request):
     except Exception:
         disk = None
     return templates.TemplateResponse(
+        request,
         "tracker_share.html",
         {
-            "request": request,
             "folders": folders,
             "root_files": root_files,
             "total_size": total_size,
@@ -371,6 +374,7 @@ async def items_rows_fragment(
             if sl in (i.title or "").lower() or sl in (i.series_title or "").lower()
         ]
     return templates.TemplateResponse(
+        request,
         "_tracker_items_rows.html",
-        {"request": request, "items": all_items},
+        {"items": all_items},
     )
