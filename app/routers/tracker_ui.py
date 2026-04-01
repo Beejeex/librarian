@@ -122,16 +122,19 @@ async def poll_now():
 # ---------------------------------------------------------------------------
 
 @router.get("/items", response_class=HTMLResponse)
-async def tracker_items(request: Request):
-    """Render the full tracked items table."""
+async def tracker_items(request: Request, tab: str = "movies"):
+    """Render the tracked items table, tabbed by media type."""
+    media_type = "movie" if tab == "movies" else "episode"
     with get_session() as session:
-        all_items = session.exec(
-            select(TrackedItem).order_by(TrackedItem.updated_at.desc())
+        items = session.exec(
+            select(TrackedItem)
+            .where(TrackedItem.media_type == media_type)
+            .order_by(TrackedItem.updated_at.desc())
         ).all()
     return templates.TemplateResponse(
         request,
         "tracker_items.html",
-        {"items": all_items},
+        {"items": items, "active_tab": tab},
     )
 
 
@@ -359,10 +362,12 @@ async def items_rows_fragment(
     dir: str = "desc",
     filter: str = "all",
     search: str = "",
+    tab: str = "movies",
 ):
     """Return only the <tr> rows for the items table for HTMX tbody refresh."""
+    media_type = "movie" if tab == "movies" else "episode"
     with get_session() as session:
-        q = select(TrackedItem)
+        q = select(TrackedItem).where(TrackedItem.media_type == media_type)
         if filter != "all":
             q = q.where(TrackedItem.status == filter)
         q = q.order_by(_order_by(sort, dir))

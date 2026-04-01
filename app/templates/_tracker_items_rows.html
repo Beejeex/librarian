@@ -16,10 +16,6 @@
       {% endif %}
     </div>
   </td>
-  <td style="white-space:nowrap;">
-    {% if item.media_type == 'movie' %}🎬{% else %}📺{% endif %}
-    {{ item.media_type | capitalize }}
-  </td>
   <td>{{ item.source | capitalize }}</td>
   <td>
     {% if item.tag %}<code style="font-size:.78rem;">{{ item.tag }}</code>{% else %}<span style="color:#94a3b8;">—</span>{% endif %}
@@ -50,6 +46,6 @@
 </tr>
 {% else %}
 <tr>
-  <td colspan="8" style="text-align:center;color:#64748b;padding:2rem;">No items tracked yet.</td>
+  <td colspan="7" style="text-align:center;color:#64748b;padding:2rem;">No items tracked yet.</td>
 </tr>
 {% endfor %}

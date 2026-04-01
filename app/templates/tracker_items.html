@@ -7,11 +7,13 @@
   <a href="/tracker" class="btn btn-ghost">← Dashboard</a>
 </div>
 
-<div class="card" x-data="{
+<div x-data="{
+  tab: '{{ active_tab }}',
   filter: 'all',
   search: '',
   sort: 'updated',
   dir: 'desc',
+  switchTab(t) { this.tab = t; this.$nextTick(() => this.$dispatch('tab-changed')); },
   setSort(col) {
     if (this.sort === col) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
     else { this.sort = col; this.dir = 'asc'; }
@@ -19,49 +21,52 @@
   }
 }">
 
-  <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
-    <input type="search"
-           placeholder="Search titles…"
-           x-model="search"
-           @input.debounce.300ms="$dispatch('search-changed')"
-           style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;flex:1;min-width:180px;max-width:320px;">
-    <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-      {% set filter_pills = [
-        ('all','#475569'), ('queued','#d97706'), ('pending','#78716c'),
-        ('copying','#7c3aed'), ('copied','#1d4ed8'), ('finished','#16a34a'), ('error','#dc2626')
-      ] %}
-      {% for label, color in filter_pills %}
-      <button class="btn"
-              style="padding:4px 12px;font-size:.8rem;"
-              :style="filter==='{{ label }}' ? 'background:{{ color }};color:#fff' : 'background:#f1f5f9;color:#374151;border:1px solid #e2e8f0'"
-              @click="filter='{{ label }}'; $dispatch('filter-changed')">{{ label | capitalize }}</button>
-      {% endfor %}
-    </div>
+  <div class="tab-nav">
+    <button type="button" class="tab-btn" :class="tab==='movies' ? 'tab-active' : ''" @click="switchTab('movies')">🎬 Movies</button>
+    <button type="button" class="tab-btn" :class="tab==='tv' ? 'tab-active' : ''" @click="switchTab('tv')">📺 TV Shows</button>
   </div>
 
-  {% if items %}
-  <table>
-    <thead>
-      <tr>
-        <th><button @click="setSort('title')" class="sort-btn">Title <span x-show="sort==='title'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
-        <th><button @click="setSort('type')" class="sort-btn">Type <span x-show="sort==='type'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
-        <th><button @click="setSort('source')" class="sort-btn">Source <span x-show="sort==='source'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
-        <th>Tag(s)</th>
-        <th><button @click="setSort('status')" class="sort-btn">Status <span x-show="sort==='status'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
-        <th><button @click="setSort('size')" class="sort-btn">Size <span x-show="sort==='size'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
-        <th><button @click="setSort('updated')" class="sort-btn">Updated <span x-show="sort==='updated'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody hx-get="/tracker/items/rows-fragment"
-           hx-trigger="every 5s, sort-changed from:body, filter-changed from:body, search-changed from:body"
-           :hx-vals="JSON.stringify({sort, dir, filter, search})"
-           hx-swap="innerHTML">
-      {% include "_tracker_items_rows.html" %}
-    </tbody>
-  </table>
-  {% else %}
-  <p style="color:#94a3b8">No items tracked yet. Configure tags in Settings and wait for the first poll.</p>
-  {% endif %}
+  <div class="card" style="border-top-left-radius:0">
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center">
+      <input type="search"
+             placeholder="Search titles…"
+             x-model="search"
+             @input.debounce.300ms="$dispatch('search-changed')"
+             style="padding:8px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:.875rem;flex:1;min-width:180px;max-width:320px;">
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        {% set filter_pills = [
+          ('all','#475569'), ('queued','#d97706'), ('pending','#78716c'),
+          ('copying','#7c3aed'), ('copied','#1d4ed8'), ('finished','#16a34a'), ('error','#dc2626')
+        ] %}
+        {% for label, color in filter_pills %}
+        <button class="btn"
+                style="padding:4px 12px;font-size:.8rem;"
+                :style="filter==='{{ label }}' ? 'background:{{ color }};color:#fff' : 'background:#f1f5f9;color:#374151;border:1px solid #e2e8f0'"
+                @click="filter='{{ label }}'; $dispatch('filter-changed')">{{ label | capitalize }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th><button @click="setSort('title')" class="sort-btn">Title <span x-show="sort==='title'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+          <th><button @click="setSort('source')" class="sort-btn">Source <span x-show="sort==='source'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+          <th>Tag(s)</th>
+          <th><button @click="setSort('status')" class="sort-btn">Status <span x-show="sort==='status'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+          <th><button @click="setSort('size')" class="sort-btn">Size <span x-show="sort==='size'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+          <th><button @click="setSort('updated')" class="sort-btn">Updated <span x-show="sort==='updated'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody hx-get="/tracker/items/rows-fragment"
+             hx-trigger="every 5s, sort-changed from:body, filter-changed from:body, search-changed from:body, tab-changed from:body"
+             :hx-vals="JSON.stringify({sort, dir, filter, search, tab})"
+             hx-swap="innerHTML">
+        {% include "_tracker_items_rows.html" %}
+      </tbody>
+    </table>
+  </div>
+
 </div>
 {% endblock %}
