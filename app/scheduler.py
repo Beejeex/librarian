@@ -450,8 +450,14 @@ async def _process_item(
                     logger.debug("Skipping finished item: %s", title)
                     return
             elif existing.status == "queued":
-                # Waiting for approval — update tag/size if changed
+                # Waiting for approval — update paths and tag/size if changed
                 changed = False
+                if existing.file_path != file_path:
+                    existing.file_path = file_path
+                    changed = True
+                if existing.share_path != share_path:
+                    existing.share_path = share_path
+                    changed = True
                 if existing.tag != tag:
                     existing.tag = tag
                     changed = True
@@ -464,9 +470,18 @@ async def _process_item(
                     session.commit()
                 return
             else:
-                # pending or error → fall through to copy; refresh size if missing
+                # pending or error → fall through to copy; refresh paths and size if changed
+                changed = False
+                if existing.file_path != file_path:
+                    existing.file_path = file_path
+                    changed = True
+                if existing.share_path != share_path:
+                    existing.share_path = share_path
+                    changed = True
                 if existing.file_size_bytes != src_size and src_size > 0:
                     existing.file_size_bytes = src_size
+                    changed = True
+                if changed:
                     existing.updated_at = datetime.now(timezone.utc)
                     session.add(existing)
                     session.commit()
