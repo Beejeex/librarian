@@ -28,6 +28,7 @@ from app.copier import (
     build_episode_share_path,
     build_movie_share_path,
     check_quota,
+    cleanup_failed_copy,
     copy_file,
     delete_share_item,
     get_file_size,
@@ -272,6 +273,35 @@ async def _poll_radarr(
 
     await asyncio.gather(*tasks)
 
+    # Orphan detection: any radarr item in an active state whose source_id was
+    # not seen in this poll no longer exists in Radarr (file replaced/removed).
+    # Mark it with an informative error so it shows up clearly in the UI.
+    if seen:  # only run when we actually fetched something successfully
+        seen_ids = set(seen.keys())
+        with get_session() as session:
+            orphans = session.exec(
+                select(TrackedItem).where(
+                    TrackedItem.source == "radarr",
+                    TrackedItem.status.in_(["queued", "pending", "error"]),
+                    ~TrackedItem.source_id.in_(seen_ids),
+                )
+            ).all()
+            for orphan in orphans:
+                orphan.status = "error"
+                orphan.error_message = (
+                    "Source file no longer tagged in Radarr — "
+                    "the file may have been replaced or untagged. "
+                    "Use Delete to remove this item."
+                )
+                orphan.updated_at = datetime.now(timezone.utc)
+                session.add(orphan)
+                logger.warning(
+                    "Orphaned radarr item %d ('%s') — source_id %d not in current poll.",
+                    orphan.id, orphan.title, orphan.source_id,
+                )
+            if orphans:
+                session.commit()
+
 
 async def _poll_sonarr(
     config: AppConfig,
@@ -336,6 +366,34 @@ async def _poll_sonarr(
         )
 
     await asyncio.gather(*tasks)
+
+    # Orphan detection: any sonarr item in an active state whose source_id was
+    # not seen in this poll no longer exists in Sonarr (file replaced/removed).
+    if seen:
+        seen_ids = set(seen.keys())
+        with get_session() as session:
+            orphans = session.exec(
+                select(TrackedItem).where(
+                    TrackedItem.source == "sonarr",
+                    TrackedItem.status.in_(["queued", "pending", "error"]),
+                    ~TrackedItem.source_id.in_(seen_ids),
+                )
+            ).all()
+            for orphan in orphans:
+                orphan.status = "error"
+                orphan.error_message = (
+                    "Source file no longer tagged in Sonarr — "
+                    "the file may have been replaced or untagged. "
+                    "Use Delete to remove this item."
+                )
+                orphan.updated_at = datetime.now(timezone.utc)
+                session.add(orphan)
+                logger.warning(
+                    "Orphaned sonarr item %d ('%s') — source_id %d not in current poll.",
+                    orphan.id, orphan.title, orphan.source_id,
+                )
+            if orphans:
+                session.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -551,6 +609,7 @@ async def _process_item(
         await notify_copied(config, title, source)
     except Exception as exc:
         _update_item_status(item.id, "error", error_message=str(exc))
+        await asyncio.to_thread(cleanup_failed_copy, share_path)
         logger.error("Failed to copy [%s] %s: %s", source, title, exc)
         await notify_error(config, title, source, str(exc))
 
@@ -654,6 +713,7 @@ async def _copy_item(config: AppConfig, semaphore: asyncio.Semaphore, item: Trac
         await notify_copied(config, item.title, item.source)
     except Exception as exc:
         _update_item_status(item.id, "error", error_message=str(exc))
+        await asyncio.to_thread(cleanup_failed_copy, item.share_path)
         logger.error("Failed to copy [%s] %s: %s", item.source, item.title, exc)
         await notify_error(config, item.title, item.source, str(exc))
 

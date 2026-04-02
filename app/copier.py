@@ -159,6 +159,24 @@ def delete_share_item(share_path: str) -> None:
         logger.warning("Could not delete stale share folder %s: %s", share_path, exc)
 
 
+def cleanup_failed_copy(share_path: str) -> None:
+    """
+    Remove a partially-written share file after a failed copy and its parent
+    folder if it is now empty.  Safe for both movie folders and series season
+    folders because it only removes the empty parent rather than an rmtree.
+    """
+    try:
+        if os.path.isfile(share_path):
+            os.remove(share_path)
+            logger.debug("Removed partial copy: %s", share_path)
+        parent = os.path.dirname(share_path)
+        if os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
+            logger.info("Removed empty share folder after failed copy: %s", parent)
+    except OSError as exc:
+        logger.warning("Could not clean up failed copy at %s: %s", share_path, exc)
+
+
 def build_movie_share_path(share_root: str, arr_file_path: str, root_folder: str) -> str:
     """
     Build the destination path for a movie file on the share.

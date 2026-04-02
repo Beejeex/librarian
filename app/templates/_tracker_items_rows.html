@@ -39,6 +39,9 @@
     <form method="post" action="/tracker/items/{{ item.id }}/reset" style="display:inline;">
       <button type="submit" class="btn btn-secondary" style="padding:4px 10px;font-size:.8rem;">Re-copy</button>
     </form>
+    <form method="post" action="/tracker/items/{{ item.id }}/delete" style="display:inline;margin-left:.3rem;" onsubmit="return confirm('Delete this item and remove it from the share?');">
+      <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:.8rem;color:#dc2626;">Delete</button>
+    </form>
     {% else %}
     <span style="color:#94a3b8;font-size:.8rem;">—</span>
     {% endif %}

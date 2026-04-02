@@ -35,6 +35,7 @@ from app.config import load_config, save_config
 from app.database import get_session
 from app.models import AppConfig, TrackedItem
 from app.scheduler import is_poll_running, reschedule_poll, run_poll
+from app.copier import delete_share_item
 
 # ---------------------------------------------------------------------------
 # Sort helpers
@@ -178,6 +179,22 @@ async def reset_item(item_id: int):
             session.add(item)
             session.commit()
             logger.info("Reset tracker item %d (%s) to pending.", item_id, item.title)
+    return RedirectResponse(url="/tracker/items", status_code=303)
+
+
+@router.post("/items/{item_id}/delete", response_class=HTMLResponse)
+async def delete_item(item_id: int):
+    """Delete a tracker item from the DB and clean up its share folder."""
+    with get_session() as session:
+        item = session.get(TrackedItem, item_id)
+        if item:
+            share_path = item.share_path
+            title = item.title
+            session.delete(item)
+            session.commit()
+            logger.info("Deleted tracker item %d (%s).", item_id, title)
+            if share_path:
+                await asyncio.to_thread(delete_share_item, share_path)
     return RedirectResponse(url="/tracker/items", status_code=303)
 
 
