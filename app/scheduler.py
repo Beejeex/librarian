@@ -275,7 +275,10 @@ async def _poll_radarr(
 
     # Orphan detection: any radarr item in an active state whose source_id was
     # not seen in this poll no longer exists in Radarr (file replaced/removed).
-    # Mark it with an informative error so it shows up clearly in the UI.
+    # The replacement file is already handled as a fresh TrackedItem by the
+    # normal _process_item path above — we just need to retire the old row.
+    #   queued  → never touched /share → delete row only
+    #   pending/error → may have a partial copy → delete row + cleanup partial
     if seen:  # only run when we actually fetched something successfully
         seen_ids = set(seen.keys())
         with get_session() as session:
@@ -286,21 +289,21 @@ async def _poll_radarr(
                     ~TrackedItem.source_id.in_(seen_ids),
                 )
             ).all()
+            partial_paths = [
+                o.share_path for o in orphans
+                if o.share_path and o.status in ("pending", "error")
+            ]
             for orphan in orphans:
-                orphan.status = "error"
-                orphan.error_message = (
-                    "Source file no longer tagged in Radarr — "
-                    "the file may have been replaced or untagged. "
-                    "Use Delete to remove this item."
-                )
-                orphan.updated_at = datetime.now(timezone.utc)
-                session.add(orphan)
-                logger.warning(
-                    "Orphaned radarr item %d ('%s') — source_id %d not in current poll.",
+                logger.info(
+                    "Auto-removing orphaned radarr item %d ('%s') — "
+                    "source_id %d no longer in current poll (file replaced/untagged).",
                     orphan.id, orphan.title, orphan.source_id,
                 )
+                session.delete(orphan)
             if orphans:
                 session.commit()
+        for sp in partial_paths:
+            await asyncio.to_thread(cleanup_failed_copy, sp)
 
 
 async def _poll_sonarr(
@@ -369,6 +372,8 @@ async def _poll_sonarr(
 
     # Orphan detection: any sonarr item in an active state whose source_id was
     # not seen in this poll no longer exists in Sonarr (file replaced/removed).
+    #   queued  → never touched /share → delete row only
+    #   pending/error → may have a partial copy → delete row + cleanup partial
     if seen:
         seen_ids = set(seen.keys())
         with get_session() as session:
@@ -379,21 +384,21 @@ async def _poll_sonarr(
                     ~TrackedItem.source_id.in_(seen_ids),
                 )
             ).all()
+            partial_paths = [
+                o.share_path for o in orphans
+                if o.share_path and o.status in ("pending", "error")
+            ]
             for orphan in orphans:
-                orphan.status = "error"
-                orphan.error_message = (
-                    "Source file no longer tagged in Sonarr — "
-                    "the file may have been replaced or untagged. "
-                    "Use Delete to remove this item."
-                )
-                orphan.updated_at = datetime.now(timezone.utc)
-                session.add(orphan)
-                logger.warning(
-                    "Orphaned sonarr item %d ('%s') — source_id %d not in current poll.",
+                logger.info(
+                    "Auto-removing orphaned sonarr item %d ('%s') — "
+                    "source_id %d no longer in current poll (file replaced/untagged).",
                     orphan.id, orphan.title, orphan.source_id,
                 )
+                session.delete(orphan)
             if orphans:
                 session.commit()
+        for sp in partial_paths:
+            await asyncio.to_thread(cleanup_failed_copy, sp)
 
 
 # ---------------------------------------------------------------------------
