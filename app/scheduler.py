@@ -29,6 +29,7 @@ from app.copier import (
     build_movie_share_path,
     check_quota,
     copy_file,
+    delete_share_item,
     get_file_size,
     get_quota_usage,
 )
@@ -393,9 +394,32 @@ async def _process_item(
 
         if existing:
             if existing.status == "copied":
-                # File is still on the share — leave it alone regardless of path changes
-                logger.debug("Skipping copied item: %s", title)
-                return
+                # Check if the source path or computed share path has changed
+                # (e.g. folder was renamed by Renamer after the file was already copied).
+                path_changed = existing.file_path != file_path
+                share_stale = existing.share_path != share_path
+                if path_changed or share_stale:
+                    # Delete the stale copy from the share before re-queueing
+                    old_share_path = existing.share_path
+                    existing.file_path = file_path
+                    existing.share_path = share_path
+                    existing.file_size_bytes = src_size
+                    existing.is_upgraded = path_changed
+                    existing.status = "pending"
+                    existing.error_message = None
+                    existing.updated_at = datetime.now(timezone.utc)
+                    session.add(existing)
+                    session.commit()
+                    await asyncio.to_thread(delete_share_item, old_share_path)
+                    logger.info(
+                        "Path changed for copied item [%s]: '%s' — deleted old share copy, resetting to pending.",
+                        source, title,
+                    )
+                    item = existing
+                else:
+                    # File is still on the share at the correct path — leave it alone
+                    logger.debug("Skipping copied item: %s", title)
+                    return
             if existing.status == "finished":
                 # Reset if source file changed (upgrade) or share_path is stale
                 # (e.g. path-building logic was corrected in a newer release).
@@ -505,6 +529,8 @@ async def _process_item(
                 title=title,
             )
         file_size = await asyncio.to_thread(get_file_size, share_path)
+        if file_size == 0 or not await asyncio.to_thread(os.path.isfile, share_path):
+            raise OSError(f"Post-copy validation failed — file not found at expected share path: {share_path}")
         _update_item_status(item.id, "copied", file_size_bytes=file_size)
         logger.info("Copied [%s]: %s", source, title)
         await notify_copied(config, title, source)
@@ -606,6 +632,8 @@ async def _copy_item(config: AppConfig, semaphore: asyncio.Semaphore, item: Trac
                 title=item.title,
             )
         file_size = await asyncio.to_thread(get_file_size, item.share_path)
+        if file_size == 0 or not await asyncio.to_thread(os.path.isfile, item.share_path):
+            raise OSError(f"Post-copy validation failed — file not found at expected share path: {item.share_path}")
         _update_item_status(item.id, "copied", file_size_bytes=file_size)
         logger.info("Copied [%s]: %s", item.source, item.title)
         await notify_copied(config, item.title, item.source)

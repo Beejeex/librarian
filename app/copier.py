@@ -139,6 +139,27 @@ def _copy_file_sync(
             copy_progress.finish(item_id)
 
 
+def delete_share_item(share_path: str) -> None:
+    """
+    Delete a file from the share and remove its parent folder if it becomes empty.
+
+    Used when an item's share path becomes stale (e.g. source folder was renamed
+    by the Renamer after the file was already copied) so the old copy doesn't
+    accumulate alongside the new one.
+    """
+    try:
+        if os.path.isfile(share_path):
+            os.remove(share_path)
+            logger.info("Deleted stale share file: %s", share_path)
+        parent = os.path.dirname(share_path)
+        # Remove parent folder only if it is now empty (leaves higher dirs untouched)
+        if os.path.isdir(parent) and not os.listdir(parent):
+            os.rmdir(parent)
+            logger.info("Removed empty share folder: %s", parent)
+    except OSError as exc:
+        logger.warning("Could not delete stale share item %s: %s", share_path, exc)
+
+
 def build_movie_share_path(share_root: str, arr_file_path: str, root_folder: str) -> str:
     """
     Build the destination path for a movie file on the share.
