@@ -1,5 +1,11 @@
 {% for item in items %}
 <tr>
+  <td style="width:32px;padding-right:0;">
+    <input type="checkbox" name="bulk_select" value="{{ item.id }}"
+           :checked="selectedIds.includes({{ item.id }})"
+           @change="toggleId({{ item.id }})"
+           style="accent-color:#3b82f6;width:15px;height:15px;cursor:pointer;">
+  </td>
   <td>
     <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px;" title="{{ item.title }}">
       {{ item.title }}
@@ -35,6 +41,10 @@
     <form method="post" action="/tracker/items/{{ item.id }}/skip" style="display:inline;margin-left:.3rem;">
       <button type="submit" class="btn btn-ghost" style="padding:4px 10px;font-size:.8rem;">Skip</button>
     </form>
+    {% elif item.status == 'pending' %}
+    <form method="post" action="/tracker/items/{{ item.id }}/backlog" style="display:inline;">
+      <button type="submit" class="btn btn-secondary" style="padding:4px 10px;font-size:.8rem;background:#854d0e;border-color:#854d0e;color:#fff;" title="Move back to backlog">Backlog</button>
+    </form>
     {% elif item.status in ('finished', 'copied', 'error') %}
     <form method="post" action="/tracker/items/{{ item.id }}/reset" style="display:inline;">
       <button type="submit" class="btn btn-secondary" style="padding:4px 10px;font-size:.8rem;">Re-copy</button>
@@ -49,6 +59,6 @@
 </tr>
 {% else %}
 <tr>
-  <td colspan="7" style="text-align:center;color:#64748b;padding:2rem;">No items tracked yet.</td>
+  <td colspan="8" style="text-align:center;color:#64748b;padding:2rem;">No items tracked yet.</td>
 </tr>
 {% endfor %}

@@ -70,6 +70,9 @@ def _run_migrations() -> None:
         ("appconfig", "sonarr_file_format", "VARCHAR NOT NULL DEFAULT ''"),
         # Renamer: optional file rename scan (added v0.2.x)
         ("appconfig", "scan_file_renames", "BOOLEAN NOT NULL DEFAULT 1"),
+        # Tracker: backlog tag support (added v0.4.0)
+        ("appconfig", "radarr_backlog_tags", "VARCHAR NOT NULL DEFAULT ''"),
+        ("appconfig", "sonarr_backlog_tags", "VARCHAR NOT NULL DEFAULT ''"),
     ]
     with engine.connect() as conn:
         for table, column, definition in new_columns:

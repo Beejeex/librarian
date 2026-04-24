@@ -219,7 +219,7 @@
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;">
 
       {# ── Radarr tags ── #}
-      <div class="card" x-data="{ tagLoaded: false }">
+      <div class="card" x-data="{ tagLoaded: false, backlogTagLoaded: false }">
         <h2 style="margin-bottom:1.25rem;">🎬 Radarr Tracker Tags</h2>
         <div class="form-group">
           <label>Tags to track</label>
@@ -246,10 +246,34 @@
             Leave empty to disable Radarr tracking.
           </p>
         </div>
+        <div class="form-group" style="margin-top:.75rem;">
+          <label>Backlog tags <span style="font-weight:400;font-size:.8rem;color:#94a3b8;">— items with these tags are always placed into backlog</span></label>
+          <div style="display:flex;gap:.5rem;align-items:flex-start;">
+            <template x-if="!backlogTagLoaded">
+              <input type="text" id="radarr_backlog_tags_text" name="radarr_backlog_tags"
+                     value="{{ config.radarr_backlog_tags }}"
+                     placeholder="e.g. backlog"
+                     style="flex:1;">
+            </template>
+            <div id="radarr-backlog-tag-picker" x-show="backlogTagLoaded" style="flex:1;"></div>
+            <button type="button" class="btn btn-secondary"
+                    style="white-space:nowrap;"
+                    hx-get="/api/tracker/radarr/backlog-tags"
+                    hx-target="#radarr-backlog-tag-picker"
+                    hx-swap="innerHTML"
+                    hx-vals='js:{"radarr_url": document.getElementById("radarr_url")?.value || "", "radarr_api_key": document.getElementById("radarr_api_key")?.value || "", "selected": getTagSelected("radarr_backlog_tags_tracker", "radarr_backlog_tags_text")}'
+                    @click="backlogTagLoaded = true">
+              Load Tags
+            </button>
+          </div>
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
+            Newly discovered items whose tag matches any tag here will be placed directly into backlog, regardless of the <em>Require approval</em> setting.
+          </p>
+        </div>
       </div>
 
       {# ── Sonarr tags ── #}
-      <div class="card" x-data="{ tagLoaded: false }">
+      <div class="card" x-data="{ tagLoaded: false, backlogTagLoaded: false }">
         <h2 style="margin-bottom:1.25rem;">📺 Sonarr Tracker Tags</h2>
         <div class="form-group">
           <label>Tags to track</label>
@@ -274,6 +298,30 @@
           <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
             Click <strong>Load Tags</strong> to choose from existing Sonarr tags, or type comma-separated.
             Leave empty to disable Sonarr tracking.
+          </p>
+        </div>
+        <div class="form-group" style="margin-top:.75rem;">
+          <label>Backlog tags <span style="font-weight:400;font-size:.8rem;color:#94a3b8;">— items with these tags are always placed into backlog</span></label>
+          <div style="display:flex;gap:.5rem;align-items:flex-start;">
+            <template x-if="!backlogTagLoaded">
+              <input type="text" id="sonarr_backlog_tags_text" name="sonarr_backlog_tags"
+                     value="{{ config.sonarr_backlog_tags }}"
+                     placeholder="e.g. backlog"
+                     style="flex:1;">
+            </template>
+            <div id="sonarr-backlog-tag-picker" x-show="backlogTagLoaded" style="flex:1;"></div>
+            <button type="button" class="btn btn-secondary"
+                    style="white-space:nowrap;"
+                    hx-get="/api/tracker/sonarr/backlog-tags"
+                    hx-target="#sonarr-backlog-tag-picker"
+                    hx-swap="innerHTML"
+                    hx-vals='js:{"sonarr_url": document.getElementById("sonarr_url")?.value || "", "sonarr_api_key": document.getElementById("sonarr_api_key")?.value || "", "selected": getTagSelected("sonarr_backlog_tags_tracker", "sonarr_backlog_tags_text")}'
+                    @click="backlogTagLoaded = true">
+              Load Tags
+            </button>
+          </div>
+          <p style="font-size:.8rem;color:#94a3b8;margin-top:4px;">
+            Newly discovered items whose tag matches any tag here will be placed directly into backlog, regardless of the <em>Require approval</em> setting.
           </p>
         </div>
       </div>

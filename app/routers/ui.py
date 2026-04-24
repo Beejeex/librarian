@@ -223,7 +223,9 @@ async def save_settings(
     scan_file_renames: str = Form(""),  # checkbox: "true" or ""
     # Tracker
     radarr_tags: list[str] = Form([]),
+    radarr_backlog_tags: list[str] = Form([]),
     sonarr_tags: list[str] = Form([]),
+    sonarr_backlog_tags: list[str] = Form([]),
     poll_interval_minutes: int = Form(15),
     max_concurrent_copies: int = Form(2),
     max_share_size_gb: float = Form(0.0),
@@ -254,7 +256,9 @@ async def save_settings(
             "batch_size": batch_size,
             "scan_file_renames": scan_file_renames == "true",
             "radarr_tags": ", ".join(radarr_tags),
+            "radarr_backlog_tags": ", ".join(radarr_backlog_tags),
             "sonarr_tags": ", ".join(sonarr_tags),
+            "sonarr_backlog_tags": ", ".join(sonarr_backlog_tags),
             "max_concurrent_copies": max_concurrent_copies,
             "max_share_size_gb": max_share_size_gb,
             "max_share_files": max_share_files,

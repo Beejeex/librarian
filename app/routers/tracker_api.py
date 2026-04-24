@@ -7,7 +7,9 @@ Provides:
   POST /api/tracker/items/{id}/approve  — approve a queued item
   POST /api/tracker/items/{id}/skip     — skip a queued item
   POST /api/tracker/items/{id}/reset    — reset finished/copied/error to pending
+  POST /api/tracker/items/{id}/backlog  — move a pending item to backlog
   POST /api/tracker/items/approve-all   — approve all queued + trigger poll
+  POST /api/tracker/items/bulk-action   — bulk action on selected items
   POST /api/tracker/poll                — trigger manual poll now
   GET  /api/tracker/logs/recent         — last N log lines (plain text)
   POST /api/tracker/logs/clear          — clear the log buffer
@@ -15,7 +17,9 @@ Provides:
   GET  /api/tracker/share/stats         — JSON quota + FS stats
   GET  /api/tracker/share/stats-html    — HTML progress-bar fragment for HTMX
   GET  /api/tracker/radarr/tags         — HTML <select> fragment of Radarr tags
+  GET  /api/tracker/radarr/backlog-tags — HTML <select> fragment of Radarr tags (backlog)
   GET  /api/tracker/sonarr/tags         — HTML <select> fragment of Sonarr tags
+  GET  /api/tracker/sonarr/backlog-tags — HTML <select> fragment of Sonarr tags (backlog)
   GET  /api/tracker/reset-first-run     — reset radarr/sonarr first-run flag, redirect to settings
   GET  /api/tracker/next-poll           — next scheduled poll time (UTC ISO)
 """
@@ -23,10 +27,12 @@ Provides:
 import asyncio
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from pydantic import BaseModel
 from sqlmodel import select
 
 from app.config import load_config
@@ -126,6 +132,88 @@ def reset_item(item_id: int):
         session.refresh(item)
         logger.info("Reset tracker item %d (%s) to pending.", item_id, item.title)
         return item
+
+
+@router.post("/items/{item_id}/backlog", response_model=TrackedItem)
+def backlog_item(item_id: int):
+    """Move a pending item to backlog (queued + is_backlog=True)."""
+    with get_session() as session:
+        item = session.get(TrackedItem, item_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found.")
+        if item.status != "pending":
+            raise HTTPException(status_code=400, detail="Only pending items can be moved to backlog.")
+        item.status = "queued"
+        item.is_backlog = True
+        item.updated_at = datetime.now(timezone.utc)
+        session.add(item)
+        session.commit()
+        session.refresh(item)
+        logger.info("Moved tracker item %d (%s) to backlog.", item_id, item.title)
+        return item
+
+
+class BulkActionRequest(BaseModel):
+    action: str  # "approve", "backlog", "skip", "delete"
+    ids: list[int]
+
+
+@router.post("/items/bulk-action")
+async def bulk_action_items(body: BulkActionRequest):
+    """Perform a bulk action on selected items.
+
+    Actions:
+      approve — queued → pending
+      backlog — pending → queued + is_backlog=True
+      skip    — queued → finished
+      delete  — remove from DB and clean up share
+    """
+    if body.action not in ("approve", "backlog", "skip", "delete"):
+        raise HTTPException(status_code=400, detail="action must be approve, backlog, skip, or delete.")
+    if not body.ids:
+        return {"status": "ok", "processed": 0}
+
+    processed = 0
+    share_paths_to_delete: list[Optional[str]] = []
+
+    with get_session() as session:
+        for item_id in body.ids:
+            item = session.get(TrackedItem, item_id)
+            if not item:
+                continue
+            if body.action == "approve" and item.status == "queued":
+                item.status = "pending"
+                item.updated_at = datetime.now(timezone.utc)
+                session.add(item)
+                processed += 1
+            elif body.action == "backlog" and item.status == "pending":
+                item.status = "queued"
+                item.is_backlog = True
+                item.updated_at = datetime.now(timezone.utc)
+                session.add(item)
+                processed += 1
+            elif body.action == "skip" and item.status == "queued":
+                item.status = "finished"
+                item.updated_at = datetime.now(timezone.utc)
+                session.add(item)
+                processed += 1
+            elif body.action == "delete":
+                share_paths_to_delete.append(item.share_path)
+                session.delete(item)
+                processed += 1
+        session.commit()
+
+    # Clean up share files after commit (outside DB session)
+    from app.copier import delete_share_item
+    for sp in share_paths_to_delete:
+        if sp:
+            await asyncio.to_thread(delete_share_item, sp)
+
+    if body.action == "approve" and processed > 0:
+        asyncio.create_task(run_poll())
+
+    logger.info("Bulk action '%s' applied to %d items.", body.action, processed)
+    return {"status": "ok", "processed": processed}
 
 
 @router.post("/items/approve-all")
@@ -428,3 +516,49 @@ async def sonarr_tags(
     else:
         error = "enter URL and API key first"
     return _build_tag_select("sonarr_tags_tracker", "sonarr_tags", tags, selected, error)
+
+
+async def _fetch_tags(url: str, api_key: str) -> tuple[list[dict], str | None]:
+    """Shared helper: fetch tags from an arr instance."""
+    tags: list[dict] = []
+    error: str | None = None
+    if url and api_key:
+        try:
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(
+                    f"{url.rstrip('/')}/api/v3/tag",
+                    headers={"X-Api-Key": api_key},
+                )
+                resp.raise_for_status()
+                tags = resp.json()
+        except httpx.TimeoutException:
+            error = "connection timed out"
+        except httpx.HTTPStatusError as exc:
+            error = f"HTTP {exc.response.status_code}"
+        except Exception as exc:
+            error = str(exc)
+    else:
+        error = "enter URL and API key first"
+    return tags, error
+
+
+@router.get("/radarr/backlog-tags", response_class=HTMLResponse)
+async def radarr_backlog_tags(
+    radarr_url: str = "",
+    radarr_api_key: str = "",
+    selected: str = "",
+):
+    """Proxy Radarr's tag list and return an HTML <select multiple> fragment for the backlog-tags field."""
+    tags, error = await _fetch_tags(radarr_url, radarr_api_key)
+    return _build_tag_select("radarr_backlog_tags_tracker", "radarr_backlog_tags", tags, selected, error)
+
+
+@router.get("/sonarr/backlog-tags", response_class=HTMLResponse)
+async def sonarr_backlog_tags(
+    sonarr_url: str = "",
+    sonarr_api_key: str = "",
+    selected: str = "",
+):
+    """Proxy Sonarr's tag list and return an HTML <select multiple> fragment for the backlog-tags field."""
+    tags, error = await _fetch_tags(sonarr_url, sonarr_api_key)
+    return _build_tag_select("sonarr_backlog_tags_tracker", "sonarr_backlog_tags", tags, selected, error)

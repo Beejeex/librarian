@@ -13,13 +13,63 @@
   search: '',
   sort: 'updated',
   dir: 'desc',
-  switchTab(t) { this.tab = t; this.$nextTick(() => this.$dispatch('tab-changed')); },
+  selectedIds: [],
+  switchTab(t) { this.tab = t; this.selectedIds = []; this.$nextTick(() => this.$dispatch('tab-changed')); },
   setSort(col) {
     if (this.sort === col) { this.dir = this.dir === 'asc' ? 'desc' : 'asc'; }
     else { this.sort = col; this.dir = 'asc'; }
     this.$dispatch('sort-changed');
+  },
+  toggleId(id) {
+    const i = this.selectedIds.indexOf(id);
+    if (i === -1) this.selectedIds.push(id);
+    else this.selectedIds.splice(i, 1);
+  },
+  toggleAll(event) {
+    const boxes = document.querySelectorAll('input[name=bulk_select]');
+    boxes.forEach(cb => {
+      const id = parseInt(cb.value);
+      if (event.target.checked) {
+        cb.checked = true;
+        if (!this.selectedIds.includes(id)) this.selectedIds.push(id);
+      } else {
+        cb.checked = false;
+        this.selectedIds = this.selectedIds.filter(x => x !== id);
+      }
+    });
+  },
+  clearSelection() {
+    this.selectedIds = [];
+    document.querySelectorAll('input[name=bulk_select]').forEach(cb => cb.checked = false);
+    const hdr = document.getElementById('select-all-checkbox');
+    if (hdr) hdr.checked = false;
+  },
+  async bulkAction(action) {
+    if (!this.selectedIds.length) return;
+    const ids = [...this.selectedIds];
+    await fetch('/tracker/items/bulk-action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action, ids})
+    });
+    this.clearSelection();
+    this.$dispatch('filter-changed');
   }
 }">
+
+  {# ── Bulk action bar (appears when items are selected) ── #}
+  <div x-show="selectedIds.length > 0"
+       x-transition
+       style="background:#1e293b;color:#f8fafc;padding:.6rem 1rem;border-radius:8px;margin-bottom:.75rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+    <span style="font-size:.875rem;font-weight:600;" x-text="selectedIds.length + ' selected'"></span>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+      <button class="btn btn-primary" style="padding:4px 12px;font-size:.8rem;" @click="bulkAction('approve')">Approve</button>
+      <button class="btn btn-secondary" style="padding:4px 12px;font-size:.8rem;background:#854d0e;border-color:#854d0e;color:#fff;" @click="bulkAction('backlog')">Move to Backlog</button>
+      <button class="btn btn-ghost" style="padding:4px 12px;font-size:.8rem;" @click="bulkAction('skip')">Skip</button>
+      <button class="btn btn-ghost" style="padding:4px 12px;font-size:.8rem;color:#dc2626;" @click="if(confirm('Delete selected items and remove from share?')) bulkAction('delete')">Delete</button>
+    </div>
+    <button class="btn btn-ghost" style="padding:4px 10px;font-size:.8rem;margin-left:auto;" @click="clearSelection()">✕ Clear</button>
+  </div>
 
   <div class="tab-nav">
     <button type="button" class="tab-btn" :class="tab==='movies' ? 'tab-active' : ''" @click="switchTab('movies')">🎬 Movies</button>
@@ -50,6 +100,10 @@
     <table>
       <thead>
         <tr>
+          <th style="width:32px;padding-right:0;">
+            <input type="checkbox" id="select-all-checkbox" @change="toggleAll($event)"
+                   style="accent-color:#3b82f6;width:15px;height:15px;cursor:pointer;">
+          </th>
           <th><button @click="setSort('title')" class="sort-btn">Title <span x-show="sort==='title'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
           <th><button @click="setSort('source')" class="sort-btn">Source <span x-show="sort==='source'" x-text="dir==='asc'?'▲':'▼'"></span></button></th>
           <th>Tag(s)</th>

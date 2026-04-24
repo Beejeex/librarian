@@ -9,9 +9,11 @@ Routes:
   GET  /tracker/items                        — Full items table
   GET  /tracker/logs                         — SSE live log viewer
   POST /tracker/items/{id}/approve           — HTMX: approve a queued item
-  POST /tracker/items/{id}/skip              — HTMX: skip a queued item
+  POST /tracker/items/{id}/skip             — HTMX: skip a queued item
   POST /tracker/items/{id}/reset             — HTMX: reset an item to pending
+  POST /tracker/items/{id}/backlog           — HTMX: move pending item to backlog
   POST /tracker/items/approve-all            — approve all queued + poll
+  POST /tracker/items/bulk-action            — bulk action on selected items
   GET  /tracker/dashboard/stats-fragment     — HTMX live stats cards
   GET  /tracker/dashboard/recent-fragment    — HTMX recent activity rows
   GET  /tracker/dashboard/poll-indicator     — HTMX copy-progress indicator
@@ -19,11 +21,13 @@ Routes:
 """
 
 import asyncio
+import json
 import logging
 import os
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -180,6 +184,77 @@ async def reset_item(item_id: int):
             session.commit()
             logger.info("Reset tracker item %d (%s) to pending.", item_id, item.title)
     return RedirectResponse(url="/tracker/items", status_code=303)
+
+
+@router.post("/items/{item_id}/backlog", response_class=HTMLResponse)
+async def backlog_item(item_id: int):
+    """Move a pending item to backlog (queued + is_backlog=True)."""
+    with get_session() as session:
+        item = session.get(TrackedItem, item_id)
+        if item and item.status == "pending":
+            item.status = "queued"
+            item.is_backlog = True
+            item.updated_at = datetime.now(timezone.utc)
+            session.add(item)
+            session.commit()
+            logger.info("Moved tracker item %d (%s) to backlog.", item_id, item.title)
+    return RedirectResponse(url="/tracker/items", status_code=303)
+
+
+@router.post("/items/bulk-action", response_class=HTMLResponse)
+async def bulk_action_items(request: Request):
+    """Perform a bulk action on selected items (sent as JSON body from Alpine.js fetch)."""
+    try:
+        body = await request.json()
+        action = body.get("action", "")
+        ids: list[int] = [int(i) for i in body.get("ids", [])]
+    except Exception:
+        return HTMLResponse(status_code=400, content="Invalid request body.")
+
+    if action not in ("approve", "backlog", "skip", "delete"):
+        return HTMLResponse(status_code=400, content="Invalid action.")
+    if not ids:
+        return HTMLResponse(status_code=200, content="")
+
+    processed = 0
+    share_paths_to_delete: list[Optional[str]] = []
+
+    with get_session() as session:
+        for item_id in ids:
+            item = session.get(TrackedItem, item_id)
+            if not item:
+                continue
+            if action == "approve" and item.status == "queued":
+                item.status = "pending"
+                item.updated_at = datetime.now(timezone.utc)
+                session.add(item)
+                processed += 1
+            elif action == "backlog" and item.status == "pending":
+                item.status = "queued"
+                item.is_backlog = True
+                item.updated_at = datetime.now(timezone.utc)
+                session.add(item)
+                processed += 1
+            elif action == "skip" and item.status == "queued":
+                item.status = "finished"
+                item.updated_at = datetime.now(timezone.utc)
+                session.add(item)
+                processed += 1
+            elif action == "delete":
+                share_paths_to_delete.append(item.share_path)
+                session.delete(item)
+                processed += 1
+        session.commit()
+
+    for sp in share_paths_to_delete:
+        if sp:
+            await asyncio.to_thread(delete_share_item, sp)
+
+    if action == "approve" and processed > 0:
+        asyncio.create_task(run_poll())
+
+    logger.info("Bulk action '%s' applied to %d items.", action, processed)
+    return HTMLResponse(status_code=200, content="")
 
 
 @router.post("/items/{item_id}/delete", response_class=HTMLResponse)

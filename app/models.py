@@ -42,7 +42,9 @@ class AppConfig(SQLModel, table=True):
 
     # --- Tracker: tags ---
     radarr_tags: str = ""  # Comma-separated tag names to watch in Radarr
+    radarr_backlog_tags: str = ""  # Comma-separated tag names that force items into backlog
     sonarr_tags: str = ""  # Comma-separated tag names to watch in Sonarr
+    sonarr_backlog_tags: str = ""  # Comma-separated tag names that force items into backlog
 
     # --- Tracker: behaviour ---
     poll_interval_minutes: int = 15

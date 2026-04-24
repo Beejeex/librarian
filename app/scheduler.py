@@ -174,8 +174,11 @@ async def run_poll() -> None:
                 and bool(config.sonarr_tags.strip())
             )
 
-            await _poll_radarr(config, semaphore, radarr_first_run, copy_enabled=False)
-            await _poll_sonarr(config, semaphore, sonarr_first_run, copy_enabled=False)
+            radarr_backlog_tag_names = _resolve_tags(config.radarr_backlog_tags)
+            sonarr_backlog_tag_names = _resolve_tags(config.sonarr_backlog_tags)
+
+            await _poll_radarr(config, semaphore, radarr_first_run, copy_enabled=False, backlog_tag_names=radarr_backlog_tag_names)
+            await _poll_sonarr(config, semaphore, sonarr_first_run, copy_enabled=False, backlog_tag_names=sonarr_backlog_tag_names)
 
             # Copy phase — non-backlog items first so new arrivals have priority
             if not (radarr_first_run or sonarr_first_run):
@@ -218,8 +221,11 @@ async def _poll_radarr(
     semaphore: asyncio.Semaphore,
     is_first_run: bool = False,
     copy_enabled: bool = True,
+    backlog_tag_names: list[str] | None = None,
 ) -> None:
     """Fetch movies tagged with any configured Radarr tag and process each."""
+    if backlog_tag_names is None:
+        backlog_tag_names = []
     if not config.radarr_url or not config.radarr_api_key:
         logger.debug("Radarr not configured — skipping.")
         return
@@ -261,6 +267,7 @@ async def _poll_radarr(
                 semaphore=semaphore,
                 is_first_run=is_first_run,
                 copy_enabled=copy_enabled,
+                backlog_tag_names=backlog_tag_names,
                 source="radarr",
                 media_type="movie",
                 source_id=movie.movie_file_id,
@@ -311,8 +318,11 @@ async def _poll_sonarr(
     semaphore: asyncio.Semaphore,
     is_first_run: bool = False,
     copy_enabled: bool = True,
+    backlog_tag_names: list[str] | None = None,
 ) -> None:
     """Fetch episode files for series tagged with any configured Sonarr tag and process each."""
+    if backlog_tag_names is None:
+        backlog_tag_names = []
     if not config.sonarr_url or not config.sonarr_api_key:
         logger.debug("Sonarr not configured — skipping.")
         return
@@ -354,6 +364,7 @@ async def _poll_sonarr(
                 semaphore=semaphore,
                 is_first_run=is_first_run,
                 copy_enabled=copy_enabled,
+                backlog_tag_names=backlog_tag_names,
                 source="sonarr",
                 media_type="episode",
                 source_id=ef.episode_file_id,
@@ -411,6 +422,7 @@ async def _process_item(
     semaphore: asyncio.Semaphore,
     is_first_run: bool = False,
     copy_enabled: bool = True,
+    backlog_tag_names: list[str] | None = None,
     source: str,
     media_type: str,
     source_id: int,
@@ -550,7 +562,14 @@ async def _process_item(
                     session.commit()
                 item = existing
         else:
-            initial_status = "queued" if (is_first_run or config.require_approval) else "pending"
+            # Determine if this new item should be treated as backlog:
+            # forced if it's a first-run index OR if any of its matched tags is a backlog tag.
+            _tag_list = [t.strip() for t in tag.split(",") if t.strip()]
+            is_backlog_tag = bool(backlog_tag_names) and any(
+                t in (backlog_tag_names or []) for t in _tag_list
+            )
+            is_backlog = is_first_run or is_backlog_tag
+            initial_status = "queued" if (is_backlog or config.require_approval) else "pending"
             item = TrackedItem(
                 source=source,
                 media_type=media_type,
@@ -560,7 +579,7 @@ async def _process_item(
                 share_path=share_path,
                 tag=tag,
                 status=initial_status,
-                is_backlog=is_first_run,
+                is_backlog=is_backlog,
                 file_size_bytes=src_size,
                 series_id=series_id,
                 series_title=series_title,
